@@ -36,6 +36,7 @@ model Post {
   business        Business @relation(fields: [businessId], references: [id])
   mediaUrl        String
   mediaType       String   // "image" | "video"
+  thumbnailUrl    String?
   caption         String
   tag             String
   shareCount      Int      @default(0)

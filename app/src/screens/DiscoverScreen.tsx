@@ -77,7 +77,7 @@ export function DiscoverScreen() {
           columnWrapperStyle={styles.gridRow}
           renderItem={({ item }) => (
             <Pressable style={styles.tile} onPress={() => navigation.navigate('PostDetail', { postId: item.id })}>
-              <PostMedia uri={item.mediaUrl} mediaType={item.mediaType} />
+              <PostMedia uri={item.mediaUrl} mediaType={item.mediaType} thumbnailUri={item.thumbnailUrl} active={false} />
               <View style={[StyleSheet.absoluteFill, styles.tileScrim]} pointerEvents="none" />
               {item.trending && (
                 <View style={styles.scoreBadge}>

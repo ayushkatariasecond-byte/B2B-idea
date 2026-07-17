@@ -74,6 +74,34 @@ describe('Verve API', () => {
     expect(feedRes.body.posts.some((p: { id: string }) => p.id === createRes.body.post.id)).toBe(true);
   });
 
+  it('stores an uploaded thumbnail alongside a video post', async () => {
+    const { token } = await signup('videoposter');
+    const createRes = await request(app)
+      .post('/posts')
+      .set('Authorization', `Bearer ${token}`)
+      .field('caption', 'A video post with a real thumbnail!')
+      .field('tag', 'Product Launch')
+      .attach('media', path.join(__dirname, 'fixtures', 'sample.png'))
+      .attach('thumbnail', path.join(__dirname, 'fixtures', 'sample.png'));
+
+    expect(createRes.status).toBe(201);
+    expect(createRes.body.post.thumbnailUrl).toMatch(/^\/uploads\//);
+    expect(createRes.body.post.thumbnailUrl).not.toBe(createRes.body.post.mediaUrl);
+  });
+
+  it('leaves thumbnailUrl null when no thumbnail is uploaded', async () => {
+    const { token } = await signup('nothumb');
+    const createRes = await request(app)
+      .post('/posts')
+      .set('Authorization', `Bearer ${token}`)
+      .field('caption', 'No thumbnail here')
+      .field('tag', 'Culture')
+      .attach('media', path.join(__dirname, 'fixtures', 'sample.png'));
+
+    expect(createRes.status).toBe(201);
+    expect(createRes.body.post.thumbnailUrl).toBeNull();
+  });
+
   it('rejects post creation without a media file', async () => {
     const { token } = await signup('nomedia');
     const res = await request(app)

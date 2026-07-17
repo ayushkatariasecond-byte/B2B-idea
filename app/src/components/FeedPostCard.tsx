@@ -13,11 +13,12 @@ import { RootStackParamList } from '../navigation/types';
 interface FeedPostCardProps {
   post: Post;
   height: number;
+  isActive: boolean;
   onToggleLike: (post: Post) => void;
   onShare: (post: Post) => void;
 }
 
-export function FeedPostCard({ post, height, onToggleLike, onShare }: FeedPostCardProps) {
+export function FeedPostCard({ post, height, isActive, onToggleLike, onShare }: FeedPostCardProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleShare = async () => {
@@ -32,7 +33,7 @@ export function FeedPostCard({ post, height, onToggleLike, onShare }: FeedPostCa
   return (
     <View style={{ height, width: '100%' }}>
       <View style={StyleSheet.absoluteFill}>
-        <PostMedia uri={post.mediaUrl} mediaType={post.mediaType} />
+        <PostMedia uri={post.mediaUrl} mediaType={post.mediaType} thumbnailUri={post.thumbnailUrl} active={isActive} />
       </View>
 
       <LinearGradient colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0)']} style={styles.topScrim} pointerEvents="none" />

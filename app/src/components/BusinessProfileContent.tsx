@@ -98,7 +98,7 @@ export function BusinessProfileContent({ business, posts, headerAction, moreActi
       }
       renderItem={({ item }) => (
         <Pressable style={styles.tile} onPress={() => navigation.navigate('PostDetail', { postId: item.id })}>
-          <PostMedia uri={item.mediaUrl} mediaType={item.mediaType} />
+          <PostMedia uri={item.mediaUrl} mediaType={item.mediaType} thumbnailUri={item.thumbnailUrl} active={false} />
         </Pressable>
       )}
       ListEmptyComponent={tab === 'posts' ? <Text style={styles.emptyGrid}>No posts yet.</Text> : null}

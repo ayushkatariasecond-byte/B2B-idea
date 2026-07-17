@@ -20,6 +20,7 @@ export interface Post {
   business: Business;
   mediaUrl: string;
   mediaType: 'image' | 'video';
+  thumbnailUrl: string | null;
   caption: string;
   tag: string;
   likeCount: number;

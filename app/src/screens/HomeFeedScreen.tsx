@@ -18,6 +18,7 @@ export function HomeFeedScreen() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activePostId, setActivePostId] = useState<string | null>(null);
   const viewedRef = useRef(new Set<string>());
 
   const load = useCallback(async (activeTab: FeedTab) => {
@@ -26,6 +27,7 @@ export function HomeFeedScreen() {
     try {
       const res = await postsApi.getFeed(activeTab);
       setPosts(res.posts);
+      setActivePostId(res.posts[0]?.id ?? null);
     } catch {
       setError('Login required for the Following feed.');
       setPosts([]);
@@ -58,7 +60,10 @@ export function HomeFeedScreen() {
     });
   }, []);
 
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: { item: Post }[] }) => {
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: { item: Post; isViewable: boolean }[] }) => {
+    if (viewableItems.length > 0) {
+      setActivePostId(viewableItems[0].item.id);
+    }
     for (const { item } of viewableItems) {
       if (!viewedRef.current.has(item.id)) {
         viewedRef.current.add(item.id);
@@ -82,7 +87,13 @@ export function HomeFeedScreen() {
           data={posts}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <FeedPostCard post={item} height={height} onToggleLike={handleToggleLike} onShare={handleShare} />
+            <FeedPostCard
+              post={item}
+              height={height}
+              isActive={item.id === activePostId}
+              onToggleLike={handleToggleLike}
+              onShare={handleShare}
+            />
           )}
           pagingEnabled
           snapToInterval={height}

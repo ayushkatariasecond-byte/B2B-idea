@@ -31,6 +31,7 @@ type PostWithRelations = {
   business: BusinessLike;
   mediaUrl: string;
   mediaType: string;
+  thumbnailUrl: string | null;
   caption: string;
   tag: string;
   shareCount: number;
@@ -56,6 +57,7 @@ export function serializePost(post: PostWithRelations) {
     business: serializeBusiness(post.business),
     mediaUrl: post.mediaUrl,
     mediaType: post.mediaType,
+    thumbnailUrl: post.thumbnailUrl,
     caption: post.caption,
     tag: post.tag,
     likeCount,

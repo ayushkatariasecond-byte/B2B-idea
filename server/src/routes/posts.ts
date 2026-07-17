@@ -85,16 +85,26 @@ const createSchema = z.object({
   tag: z.string().min(1).max(40),
 });
 
-postsRouter.post('/', requireAuth, upload.single('media'), async (req: AuthedRequest, res) => {
+const postUpload = upload.fields([
+  { name: 'media', maxCount: 1 },
+  { name: 'thumbnail', maxCount: 1 },
+]);
+
+postsRouter.post('/', requireAuth, postUpload, async (req: AuthedRequest, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' });
-  if (!req.file) return res.status(400).json({ error: 'A photo or video is required' });
+
+  const files = req.files as { media?: Express.Multer.File[]; thumbnail?: Express.Multer.File[] } | undefined;
+  const mediaFile = files?.media?.[0];
+  const thumbnailFile = files?.thumbnail?.[0];
+  if (!mediaFile) return res.status(400).json({ error: 'A photo or video is required' });
 
   const post = await prisma.post.create({
     data: {
       businessId: req.businessId!,
-      mediaUrl: `/uploads/${req.file.filename}`,
-      mediaType: mediaTypeFromMime(req.file.mimetype),
+      mediaUrl: `/uploads/${mediaFile.filename}`,
+      mediaType: mediaTypeFromMime(mediaFile.mimetype),
+      thumbnailUrl: thumbnailFile ? `/uploads/${thumbnailFile.filename}` : null,
       caption: parsed.data.caption,
       tag: parsed.data.tag,
     },

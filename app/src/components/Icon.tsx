@@ -16,7 +16,10 @@ export type IconName =
   | 'checkBadge'
   | 'barChart'
   | 'star'
-  | 'mail';
+  | 'mail'
+  | 'volumeOn'
+  | 'volumeOff'
+  | 'play';
 
 interface IconProps {
   name: IconName;
@@ -130,6 +133,27 @@ export function Icon({ name, size = 22, color = '#000000', strokeWidth = 1.8 }: 
         <Svg width={size} height={size} viewBox="0 0 24 24">
           <Path d="M4 4h13l3 3v13H4V4Z" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinejoin="round" />
           <Path d="M8 9h8M8 13h5" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+        </Svg>
+      );
+    case 'volumeOn':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path d="M4 9v6h4l5 5V4L8 9H4Z" fill={color} />
+          <Path d="M16.5 9a3.5 3.5 0 0 1 0 6" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" />
+          <Path d="M19 6.5a7 7 0 0 1 0 11" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" />
+        </Svg>
+      );
+    case 'volumeOff':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path d="M4 9v6h4l5 5V4L8 9H4Z" fill={color} />
+          <Path d="M16 9.5 21 14.5M21 9.5 16 14.5" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+        </Svg>
+      );
+    case 'play':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path d="M6 4v16l14-8L6 4Z" fill={color} />
         </Svg>
       );
     default:

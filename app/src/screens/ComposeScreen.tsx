@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
@@ -11,14 +11,23 @@ import { RootStackParamList } from '../navigation/types';
 import { POST_TAGS } from '../api/types';
 import * as postsApi from '../api/posts';
 import { ApiError } from '../api/client';
+import { generateVideoThumbnail, ThumbnailFile } from '../utils/videoThumbnail';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Compose'>;
 
+function isVideoAsset(asset: ImagePicker.ImagePickerAsset): boolean {
+  return asset.type === 'video' || /\.(mp4|mov|m4v|webm)$/i.test(asset.uri);
+}
+
 export function ComposeScreen({ navigation }: Props) {
   const [media, setMedia] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [thumbnail, setThumbnail] = useState<ThumbnailFile | null>(null);
+  const [generatingThumbnail, setGeneratingThumbnail] = useState(false);
   const [caption, setCaption] = useState('');
   const [tag, setTag] = useState(POST_TAGS[0]);
   const [posting, setPosting] = useState(false);
+
+  const isVideo = media ? isVideoAsset(media) : false;
 
   const pickMedia = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -30,8 +39,17 @@ export function ComposeScreen({ navigation }: Props) {
       mediaTypes: ['images', 'videos'],
       quality: 0.85,
     });
-    if (!result.canceled && result.assets.length > 0) {
-      setMedia(result.assets[0]);
+    if (result.canceled || result.assets.length === 0) return;
+
+    const asset = result.assets[0];
+    setMedia(asset);
+    setThumbnail(null);
+
+    if (isVideoAsset(asset)) {
+      setGeneratingThumbnail(true);
+      const thumb = await generateVideoThumbnail(asset.uri);
+      setThumbnail(thumb);
+      setGeneratingThumbnail(false);
     }
   };
 
@@ -42,13 +60,13 @@ export function ComposeScreen({ navigation }: Props) {
     }
     setPosting(true);
     try {
-      const isVideo = media.type === 'video' || /\.(mp4|mov|m4v)$/i.test(media.uri);
       await postsApi.createPost({
         uri: media.uri,
         fileName: media.fileName ?? (isVideo ? 'upload.mp4' : 'upload.jpg'),
         mimeType: media.mimeType ?? (isVideo ? 'video/mp4' : 'image/jpeg'),
         caption,
         tag,
+        thumbnail: thumbnail ?? undefined,
       });
       navigation.goBack();
     } catch (e) {
@@ -72,8 +90,19 @@ export function ComposeScreen({ navigation }: Props) {
 
       <ScrollView contentContainerStyle={styles.body}>
         <Pressable style={styles.dropZone} onPress={pickMedia}>
-          {media ? (
+          {media && !isVideo ? (
             <Image source={{ uri: media.uri }} style={styles.dropZoneImage} contentFit="cover" />
+          ) : media && isVideo ? (
+            <>
+              {thumbnail ? (
+                <Image source={{ uri: thumbnail.uri }} style={styles.dropZoneImage} contentFit="cover" />
+              ) : (
+                <View style={[styles.dropZoneImage, styles.videoFallback]} />
+              )}
+              <View style={styles.playBadge}>
+                {generatingThumbnail ? <ActivityIndicator color={colors.white} /> : <Icon name="send" color={colors.white} size={20} />}
+              </View>
+            </>
           ) : (
             <Text style={styles.dropZoneText}>Drop your video or image — 9:16 works best</Text>
           )}
@@ -136,7 +165,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  dropZoneImage: { width: '100%', height: '100%' },
+  dropZoneImage: { width: '100%', height: '100%', position: 'absolute' },
+  videoFallback: { backgroundColor: colors.dark },
+  playBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   dropZoneText: { color: colors.inkSoft, fontFamily: fonts.body.medium, textAlign: 'center', paddingHorizontal: 30 },
   field: { gap: 6 },
   fieldLabel: { fontSize: 12, fontWeight: '700', color: colors.inkSoft, textTransform: 'uppercase', letterSpacing: 0.4, fontFamily: fonts.body.bold },

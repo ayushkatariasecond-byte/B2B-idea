@@ -17,19 +17,36 @@ export function getPost(id: string) {
   return api.get<{ post: Post }>(`/posts/${id}`);
 }
 
-export async function createPost(input: { uri: string; fileName: string; mimeType: string; caption: string; tag: string }) {
+interface FilePart {
+  uri: string;
+  fileName: string;
+  mimeType: string;
+}
+
+async function appendFile(form: FormData, field: string, file: FilePart) {
+  if (Platform.OS === 'web') {
+    // On web the picker gives a blob:/data: URI; fetch it to get a real Blob for FormData.
+    const blob = await (await fetch(file.uri)).blob();
+    form.append(field, blob, file.fileName);
+  } else {
+    // React Native's fetch/FormData polyfill accepts this { uri, name, type } shape natively.
+    form.append(field, { uri: file.uri, name: file.fileName, type: file.mimeType } as unknown as Blob);
+  }
+}
+
+export async function createPost(input: {
+  uri: string;
+  fileName: string;
+  mimeType: string;
+  caption: string;
+  tag: string;
+  thumbnail?: FilePart;
+}) {
   const form = new FormData();
   form.append('caption', input.caption);
   form.append('tag', input.tag);
-
-  if (Platform.OS === 'web') {
-    // On web the picker gives a blob:/data: URI; fetch it to get a real Blob for FormData.
-    const blob = await (await fetch(input.uri)).blob();
-    form.append('media', blob, input.fileName);
-  } else {
-    // React Native's fetch/FormData polyfill accepts this { uri, name, type } shape natively.
-    form.append('media', { uri: input.uri, name: input.fileName, type: input.mimeType } as unknown as Blob);
-  }
+  await appendFile(form, 'media', input);
+  if (input.thumbnail) await appendFile(form, 'thumbnail', input.thumbnail);
 
   return api.postForm<{ post: Post }>('/posts', form);
 }
