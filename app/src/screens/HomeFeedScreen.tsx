@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, FlatList, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FeedPostCard } from '../components/FeedPostCard';
 import { BottomNav } from '../components/BottomNav';
@@ -10,7 +10,10 @@ import * as postsApi from '../api/posts';
 type FeedTab = 'forYou' | 'following';
 
 export function HomeFeedScreen() {
-  const { height } = useWindowDimensions();
+  // Measured from our own container rather than the window: on desktop web the
+  // app renders inside a fixed-width phone-sized column, not the full browser window.
+  const [height, setHeight] = useState(0);
+  const onLayout = useCallback((e: LayoutChangeEvent) => setHeight(e.nativeEvent.layout.height), []);
   const [tab, setTab] = useState<FeedTab>('forYou');
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +68,7 @@ export function HomeFeedScreen() {
   }).current;
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} onLayout={onLayout}>
       {loading && posts.length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator color={colors.gold} />
@@ -74,7 +77,7 @@ export function HomeFeedScreen() {
         <View style={styles.center}>
           <Text style={styles.emptyText}>{error ?? "Nothing here yet — follow a few businesses to fill this feed."}</Text>
         </View>
-      ) : (
+      ) : height === 0 ? null : (
         <FlatList
           data={posts}
           keyExtractor={(item) => item.id}
