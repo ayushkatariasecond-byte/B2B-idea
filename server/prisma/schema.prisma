@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Business {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  handle       String   @unique
+  category     String
+  bio          String   @default("")
+  avatarUrl    String?
+  coverUrl     String?
+  createdAt    DateTime @default(now())
+
+  posts           Post[]
+  likes           Like[]
+  comments        Comment[]
+  following       Follow[]        @relation("Follower")
+  followers       Follow[]        @relation("Followee")
+  views           PostView[]
+  sentMessages    Message[]
+  threadsAsA      Thread[]        @relation("ThreadA")
+  threadsAsB      Thread[]        @relation("ThreadB")
+}
+
+model Post {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id])
+  mediaUrl        String
+  mediaType       String   // "image" | "video"
+  caption         String
+  tag             String
+  shareCount      Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  likes    Like[]
+  comments Comment[]
+  views    PostView[]
+
+  @@index([businessId])
+  @@index([tag])
+}
+
+model Like {
+  id         String   @id @default(cuid())
+  postId     String
+  post       Post     @relation(fields: [postId], references: [id])
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@unique([postId, businessId])
+}
+
+model Comment {
+  id         String   @id @default(cuid())
+  postId     String
+  post       Post     @relation(fields: [postId], references: [id])
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id])
+  text       String
+  createdAt  DateTime @default(now())
+
+  @@index([postId])
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  follower    Business @relation("Follower", fields: [followerId], references: [id])
+  followeeId  String
+  followee    Business @relation("Followee", fields: [followeeId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followeeId])
+}
+
+model PostView {
+  id         String   @id @default(cuid())
+  postId     String
+  post       Post     @relation(fields: [postId], references: [id])
+  viewerId   String?
+  viewer     Business? @relation(fields: [viewerId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@index([postId])
+  @@index([createdAt])
+}
+
+model Thread {
+  id            String   @id @default(cuid())
+  participantAId String
+  participantA   Business @relation("ThreadA", fields: [participantAId], references: [id])
+  participantBId String
+  participantB   Business @relation("ThreadB", fields: [participantBId], references: [id])
+  createdAt     DateTime @default(now())
+
+  messages Message[]
+
+  @@unique([participantAId, participantBId])
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  threadId   String
+  thread     Thread   @relation(fields: [threadId], references: [id])
+  senderId   String
+  sender     Business @relation(fields: [senderId], references: [id])
+  text       String
+  createdAt  DateTime @default(now())
+  readAt     DateTime?
+
+  @@index([threadId])
+}

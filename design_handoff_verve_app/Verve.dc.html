@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; background: oklch(0.95 0.006 95); font-family: 'Manrope', sans-serif; }
+    * { box-sizing: border-box; }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 28px; padding: 40px 20px 80px; background: oklch(0.95 0.006 95);">
+
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;">
+    <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 28px; letter-spacing: -0.5px; color: oklch(0.17 0.01 95);">verve<span style="color: oklch(0.74 0.15 85);">.</span></div>
+    <div style="font-size: 14px; color: oklch(0.5 0.01 95); max-width: 360px;">B2B marketing, built to go viral. The creative feed for buyers and sellers.</div>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 620px;">
+    <button onClick="{{ goScreen_onboarding }}" style="border: none; cursor: pointer; padding: 9px 16px; border-radius: 100px; font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 13px; background: {{ pillBg_onboarding }}; color: {{ pillColor_onboarding }};">Onboarding</button>
+    <button onClick="{{ goScreen_home }}" style="border: none; cursor: pointer; padding: 9px 16px; border-radius: 100px; font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 13px; background: {{ pillBg_home }}; color: {{ pillColor_home }};">Home Feed</button>
+    <button onClick="{{ goScreen_discover }}" style="border: none; cursor: pointer; padding: 9px 16px; border-radius: 100px; font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 13px; background: {{ pillBg_discover }}; color: {{ pillColor_discover }};">Discover</button>
+    <button onClick="{{ goScreen_compose }}" style="border: none; cursor: pointer; padding: 9px 16px; border-radius: 100px; font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 13px; background: {{ pillBg_compose }}; color: {{ pillColor_compose }};">Compose</button>
+    <button onClick="{{ goScreen_postDetail }}" style="border: none; cursor: pointer; padding: 9px 16px; border-radius: 100px; font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 13px; background: {{ pillBg_postDetail }}; color: {{ pillColor_postDetail }};">Post Detail</button>
+    <button onClick="{{ goScreen_profile }}" style="border: none; cursor: pointer; padding: 9px 16px; border-radius: 100px; font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 13px; background: {{ pillBg_profile }}; color: {{ pillColor_profile }};">Profile</button>
+    <button onClick="{{ goScreen_analytics }}" style="border: none; cursor: pointer; padding: 9px 16px; border-radius: 100px; font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 13px; background: {{ pillBg_analytics }}; color: {{ pillColor_analytics }};">Analytics</button>
+    <button onClick="{{ goScreen_messages }}" style="border: none; cursor: pointer; padding: 9px 16px; border-radius: 100px; font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 13px; background: {{ pillBg_messages }}; color: {{ pillColor_messages }};">Messages</button>
+  </div>
+
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDarkScreen }}" hint-size="402,874">
+
+    <!-- ONBOARDING -->
+    <sc-if value="{{ sOnboarding }}" hint-placeholder-val="{{ true }}">
+      <div style="height: 100%; width: 100%; background: #ffffff; display: flex; flex-direction: column; padding: 90px 28px 40px; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 130px; right: -60px; width: 220px; height: 300px; border-radius: 28px; background: oklch(0.97 0.01 90); transform: rotate(9deg); box-shadow: 0 20px 40px rgba(0,0,0,0.06);"></div>
+        <div style="position: absolute; top: 190px; right: 10px; width: 190px; height: 260px; border-radius: 24px; background: oklch(0.74 0.15 85); transform: rotate(-6deg); box-shadow: 0 20px 40px rgba(0,0,0,0.1); display: flex; align-items: flex-end; padding: 18px;">
+          <div style="color: #ffffff; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; line-height: 1.3;">96 creativity score</div>
+        </div>
+        <div style="position: relative; z-index: 2; margin-top: 220px;">
+          <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; line-height: 1.05; color: oklch(0.17 0.01 95); letter-spacing: -1px;">B2B marketing<br/>that isn't boring.</div>
+          <div style="margin-top: 14px; font-size: 15px; line-height: 1.5; color: oklch(0.5 0.01 95); max-width: 300px;">A feed built for business buyers — where creative posts get seen, not suppressed.</div>
+        </div>
+        <div style="flex: 1;"></div>
+        <div style="position: relative; z-index: 2; display: flex; flex-direction: column; gap: 10px;">
+          <button onClick="{{ goScreen_home }}" style="border: none; cursor: pointer; height: 56px; border-radius: 16px; background: oklch(0.74 0.15 85); color: #ffffff; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px;">Create your business page</button>
+          <button onClick="{{ goScreen_home }}" style="border: none; cursor: pointer; height: 56px; border-radius: 16px; background: transparent; color: oklch(0.17 0.01 95); font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 15px;">I already have an account</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- HOME FEED -->
+    <sc-if value="{{ sHome }}" hint-placeholder-val="{{ false }}">
+      <div style="height: 100%; width: 100%; position: relative; background: oklch(0.13 0.01 90); overflow: hidden;">
+        <div style="position: absolute; inset: 0;">
+          <image-slot id="feed-video-active" shape="rect" placeholder="Drop 9:16 video — {{ activePostBiz }}" style="width: 100%; height: 100%;"></image-slot>
+        </div>
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 220px; background: linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0)); pointer-events: none;"></div>
+        <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 320px; background: linear-gradient(0deg, rgba(0,0,0,0.75), rgba(0,0,0,0)); pointer-events: none;"></div>
+
+        <div style="position: absolute; top: 58px; left: 0; right: 0; display: flex; justify-content: center; gap: 26px; z-index: 3;">
+          <button onClick="{{ setFollowing }}" style="background: none; border: none; cursor: pointer; font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px; color: {{ followingTabColor }}; padding-bottom: 6px; border-bottom: 2px solid {{ followingTabBorder }};">Following</button>
+          <button onClick="{{ setForYou }}" style="background: none; border: none; cursor: pointer; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; color: {{ forYouTabColor }}; padding-bottom: 6px; border-bottom: 2px solid {{ forYouTabBorder }};">For You</button>
+        </div>
+
+        <div style="position: absolute; right: 12px; bottom: 130px; display: flex; flex-direction: column; align-items: center; gap: 22px; z-index: 3;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+            <svg width="30" height="27" viewBox="0 0 24 22"><path d="M12 20S2 14 2 7.5C2 4 4.5 2 7.5 2c2 0 3.5 1 4.5 2.5C13 3 14.5 2 16.5 2 19.5 2 22 4 22 7.5 22 14 12 20 12 20Z" fill="#ffffff"/></svg>
+            <span style="color: #ffffff; font-size: 12px; font-weight: 700; font-family: 'Manrope', sans-serif;">{{ activePostLikes }}</span>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+            <svg width="28" height="27" viewBox="0 0 24 22"><path d="M2 3h20v13H8l-6 5V3Z" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linejoin="round"/></svg>
+            <span style="color: #ffffff; font-size: 12px; font-weight: 700; font-family: 'Manrope', sans-serif;">{{ activePostComments }}</span>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+            <svg width="27" height="27" viewBox="0 0 24 24"><path d="M4 12 20 4l-5 18-3-8-8-2Z" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linejoin="round"/></svg>
+            <span style="color: #ffffff; font-size: 12px; font-weight: 700; font-family: 'Manrope', sans-serif;">{{ activePostShares }}</span>
+          </div>
+          <div style="width: 40px; height: 40px; border-radius: 50%; background: oklch(0.74 0.15 85); display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 3h16v18l-8-5-8 5V3Z" fill="#ffffff"/></svg>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 16px; right: 90px; bottom: 34px; z-index: 3;">
+          <sc-if value="{{ activePostTrending }}" hint-placeholder-val="{{ false }}">
+            <div style="display: inline-flex; align-items: center; gap: 5px; background: oklch(0.74 0.15 85); color: #ffffff; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 11px; padding: 5px 10px; border-radius: 100px; margin-bottom: 8px;">TRENDING · {{ activePostScore }} SCORE</div>
+          </sc-if>
+          <div style="color: #ffffff; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px;">{{ activePostHandle }}</div>
+          <div style="color: rgba(255,255,255,0.85); font-size: 13px; font-weight: 500; margin-top: 2px;">{{ activePostTag }}</div>
+          <div style="color: #ffffff; font-size: 14px; line-height: 1.4; margin-top: 6px;">{{ activePostCaption }}</div>
+        </div>
+
+        <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 84px; background: rgba(10,10,10,0.55); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-around; padding-bottom: 14px; z-index: 4;">
+          <button onClick="{{ goScreen_home }}" style="background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px;">
+            <svg width="24" height="24" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9h-6v-6h-4v6H4v-9Z" fill="oklch(0.74 0.15 85)"/></svg>
+          </button>
+          <button onClick="{{ goScreen_discover }}" style="background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px;">
+            <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.8"/><path d="M16.2 16.2 21 21" stroke="rgba(255,255,255,0.6)" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </button>
+          <button onClick="{{ goScreen_compose }}" style="background: oklch(0.74 0.15 85); border: none; cursor: pointer; width: 44px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+            <svg width="18" height="18" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/></svg>
+          </button>
+          <button onClick="{{ goScreen_messages }}" style="background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px;">
+            <svg width="22" height="22" viewBox="0 0 24 22"><path d="M2 3h20v13H8l-6 5V3Z" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          </button>
+          <button onClick="{{ goScreen_profile }}" style="background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px;">
+            <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.8"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- DISCOVER -->
+    <sc-if value="{{ sDiscover }}" hint-placeholder-val="{{ false }}">
+      <div style="height: 100%; width: 100%; background: #ffffff; display: flex; flex-direction: column;">
+        <div style="padding: 58px 20px 14px; display: flex; flex-direction: column; gap: 12px;">
+          <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 26px; color: oklch(0.17 0.01 95);">Discover</div>
+          <div style="height: 44px; border-radius: 12px; background: oklch(0.96 0.005 95); display: flex; align-items: center; gap: 8px; padding: 0 14px;">
+            <svg width="17" height="17" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="oklch(0.5 0.01 95)" stroke-width="1.8"/><path d="M16.2 16.2 21 21" stroke="oklch(0.5 0.01 95)" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <span style="color: oklch(0.55 0.01 95); font-size: 14px;">Search businesses, tags, topics</span>
+          </div>
+          <div style="display: flex; gap: 8px; overflow-x: auto;">
+            <div style="flex-shrink: 0; padding: 7px 14px; border-radius: 100px; background: oklch(0.74 0.15 85); color: #ffffff; font-size: 13px; font-weight: 700;">Trending</div>
+            <div style="flex-shrink: 0; padding: 7px 14px; border-radius: 100px; background: oklch(0.96 0.005 95); color: oklch(0.4 0.01 95); font-size: 13px; font-weight: 600;">Product Launch</div>
+            <div style="flex-shrink: 0; padding: 7px 14px; border-radius: 100px; background: oklch(0.96 0.005 95); color: oklch(0.4 0.01 95); font-size: 13px; font-weight: 600;">Culture</div>
+            <div style="flex-shrink: 0; padding: 7px 14px; border-radius: 100px; background: oklch(0.96 0.005 95); color: oklch(0.4 0.01 95); font-size: 13px; font-weight: 600;">Case Study</div>
+          </div>
+        </div>
+        <div style="flex: 1; overflow: auto; padding: 4px 12px 100px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <sc-for list="{{ discoverPosts }}" as="dp" hint-placeholder-count="6">
+            <div onClick="{{ dp.open }}" style="position: relative; border-radius: 14px; overflow: hidden; aspect-ratio: 9/13; cursor: pointer;">
+              <image-slot id="{{ dp.slotId }}" shape="rect" placeholder="{{ dp.placeholder }}" style="width: 100%; height: 100%;"></image-slot>
+              <div style="position: absolute; inset: 0; background: linear-gradient(0deg, rgba(0,0,0,0.7), transparent 55%); pointer-events: none;"></div>
+              <sc-if value="{{ dp.trending }}" hint-placeholder-val="{{ false }}">
+                <div style="position: absolute; top: 8px; left: 8px; background: oklch(0.74 0.15 85); color: #ffffff; font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 100px; font-family: 'Space Grotesk', sans-serif;">{{ dp.score }}</div>
+              </sc-if>
+              <div style="position: absolute; bottom: 8px; left: 8px; right: 8px; color: #ffffff;">
+                <div style="font-size: 12px; font-weight: 700; font-family: 'Space Grotesk', sans-serif;">{{ dp.biz }}</div>
+                <div style="font-size: 10px; color: rgba(255,255,255,0.8); margin-top: 1px;">{{ dp.likes }} likes</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="height: 84px;"></div>
+      </div>
+    </sc-if>
+
+    <!-- COMPOSE -->
+    <sc-if value="{{ sCompose }}" hint-placeholder-val="{{ false }}">
+      <div style="height: 100%; width: 100%; background: #ffffff; display: flex; flex-direction: column;">
+        <div style="padding: 58px 18px 12px; display: flex; align-items: center; justify-content: space-between;">
+          <button onClick="{{ goScreen_home }}" style="background: none; border: none; cursor: pointer; font-size: 15px; color: oklch(0.5 0.01 95); font-weight: 600;">Cancel</button>
+          <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; color: oklch(0.17 0.01 95);">New Post</div>
+          <button onClick="{{ goScreen_home }}" style="background: oklch(0.74 0.15 85); border: none; cursor: pointer; color: #ffffff; font-weight: 700; font-size: 14px; padding: 8px 16px; border-radius: 100px;">Post</button>
+        </div>
+        <div style="flex: 1; overflow: auto; padding: 8px 18px 24px; display: flex; flex-direction: column; gap: 16px;">
+          <image-slot id="compose-video" shape="rounded" radius="18" placeholder="Drop your video or image — 9:16 works best" style="width: 100%; height: 340px;"></image-slot>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div style="font-size: 12px; font-weight: 700; color: oklch(0.5 0.01 95); text-transform: uppercase; letter-spacing: 0.4px;">Caption</div>
+            <div style="min-height: 70px; border-radius: 14px; background: oklch(0.97 0.005 95); padding: 12px 14px; font-size: 14px; color: oklch(0.35 0.01 95); line-height: 1.5;">We taught a warehouse arm to dance. Turns out efficiency looks good with rhythm...</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: 14px; background: oklch(0.94 0.05 90);">
+            <svg width="22" height="22" viewBox="0 0 24 24" style="flex-shrink: 0;"><path d="M12 2 14.5 9H21l-5.2 4.3L17.8 21 12 16.8 6.2 21l2-7.7L3 9h6.5L12 2Z" fill="oklch(0.6 0.14 78)"/></svg>
+            <div>
+              <div style="font-size: 13px; font-weight: 700; color: oklch(0.35 0.08 85);">Boost your creativity score</div>
+              <div style="font-size: 12px; color: oklch(0.45 0.06 85); margin-top: 1px;">Original formats and bold hooks rank higher in For You.</div>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div style="font-size: 12px; font-weight: 700; color: oklch(0.5 0.01 95); text-transform: uppercase; letter-spacing: 0.4px;">Tag</div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <div style="padding: 7px 14px; border-radius: 100px; background: oklch(0.74 0.15 85); color: #ffffff; font-size: 13px; font-weight: 700;">Product Launch</div>
+              <div style="padding: 7px 14px; border-radius: 100px; background: oklch(0.96 0.005 95); color: oklch(0.4 0.01 95); font-size: 13px; font-weight: 600;">Culture</div>
+              <div style="padding: 7px 14px; border-radius: 100px; background: oklch(0.96 0.005 95); color: oklch(0.4 0.01 95); font-size: 13px; font-weight: 600;">Case Study</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- POST DETAIL -->
+    <sc-if value="{{ sPostDetail }}" hint-placeholder-val="{{ false }}">
+      <div style="height: 100%; width: 100%; position: relative; background: oklch(0.13 0.01 90); display: flex; flex-direction: column;">
+        <div style="position: relative; height: 56%; flex-shrink: 0;">
+          <image-slot id="detail-video" shape="rect" placeholder="Drop 9:16 video — {{ activePostBiz }}" style="width: 100%; height: 100%;"></image-slot>
+          <div style="position: absolute; inset: 0; background: linear-gradient(0deg, rgba(0,0,0,0.6), transparent 40%); pointer-events: none;"></div>
+          <button onClick="{{ goScreen_home }}" style="position: absolute; top: 58px; left: 16px; width: 36px; height: 36px; border-radius: 50%; background: rgba(0,0,0,0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+            <svg width="10" height="18" viewBox="0 0 12 20"><path d="M10 2 2 10l8 8" stroke="#ffffff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div style="position: absolute; left: 16px; right: 16px; bottom: 14px;">
+            <div style="color: #ffffff; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px;">{{ activePostHandle }}</div>
+            <div style="color: #ffffff; font-size: 13px; line-height: 1.4; margin-top: 4px;">{{ activePostCaption }}</div>
+          </div>
+        </div>
+        <div style="flex: 1; background: #ffffff; border-radius: 20px 20px 0 0; margin-top: -18px; position: relative; display: flex; flex-direction: column; overflow: hidden;">
+          <div style="display: flex; align-items: center; justify-content: space-around; padding: 14px 18px 10px; border-bottom: 1px solid oklch(0.92 0.006 95);">
+            <div style="text-align: center;"><div style="font-weight: 700; font-size: 14px; color: oklch(0.17 0.01 95);">{{ activePostLikes }}</div><div style="font-size: 11px; color: oklch(0.55 0.01 95);">Likes</div></div>
+            <div style="text-align: center;"><div style="font-weight: 700; font-size: 14px; color: oklch(0.17 0.01 95);">{{ activePostComments }}</div><div style="font-size: 11px; color: oklch(0.55 0.01 95);">Comments</div></div>
+            <div style="text-align: center;"><div style="font-weight: 700; font-size: 14px; color: oklch(0.17 0.01 95);">{{ activePostShares }}</div><div style="font-size: 11px; color: oklch(0.55 0.01 95);">Shares</div></div>
+            <div style="text-align: center;"><div style="font-weight: 700; font-size: 14px; color: oklch(0.6 0.14 78);">{{ activePostScore }}</div><div style="font-size: 11px; color: oklch(0.55 0.01 95);">Score</div></div>
+          </div>
+          <div style="flex: 1; overflow: auto; padding: 12px 18px;">
+            <sc-for list="{{ comments }}" as="c" hint-placeholder-count="3">
+              <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+                <div style="width: 32px; height: 32px; border-radius: 50%; background: oklch(0.9 0.03 85); flex-shrink: 0;"></div>
+                <div>
+                  <div style="font-size: 13px; font-weight: 700; color: oklch(0.17 0.01 95);">{{ c.who }}</div>
+                  <div style="font-size: 13px; color: oklch(0.4 0.01 95); line-height: 1.4; margin-top: 2px;">{{ c.text }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="padding: 10px 18px 18px; display: flex; gap: 10px; align-items: center; border-top: 1px solid oklch(0.94 0.006 95);">
+            <div style="flex: 1; height: 40px; border-radius: 100px; background: oklch(0.96 0.005 95); display: flex; align-items: center; padding: 0 16px; font-size: 13px; color: oklch(0.55 0.01 95);">Add a comment...</div>
+            <div style="width: 40px; height: 40px; border-radius: 50%; background: oklch(0.74 0.15 85); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 12 20 4l-5 18-3-8-8-2Z" fill="#ffffff"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- PROFILE -->
+    <sc-if value="{{ sProfile }}" hint-placeholder-val="{{ false }}">
+      <div style="height: 100%; width: 100%; background: #ffffff; display: flex; flex-direction: column;">
+        <div style="flex: 1; overflow: auto; padding-bottom: 100px;">
+          <div style="position: relative; height: 130px;">
+            <image-slot id="profile-cover" shape="rect" placeholder="Drop cover banner" style="width: 100%; height: 100%;"></image-slot>
+            <div style="position: absolute; top: 58px; right: 16px; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center;">
+              <svg width="17" height="17" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8" fill="#fff"/><circle cx="12" cy="12" r="1.8" fill="#fff"/><circle cx="12" cy="19" r="1.8" fill="#fff"/></svg>
+            </div>
+          </div>
+          <div style="padding: 0 20px;">
+            <div style="display: flex; align-items: flex-end; justify-content: space-between; margin-top: -34px;">
+              <image-slot id="profile-avatar" shape="circle" placeholder="Logo" style="width: 76px; height: 76px; border: 4px solid #ffffff;"></image-slot>
+              <button style="background: oklch(0.74 0.15 85); border: none; cursor: pointer; color: #ffffff; font-weight: 700; font-size: 13px; padding: 9px 18px; border-radius: 100px; margin-bottom: 6px;">Follow</button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; margin-top: 12px;">
+              <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 19px; color: oklch(0.17 0.01 95);">Nova Robotics</div>
+              <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 2l2.6 1.5 3-.3 1.2 2.8 2.8 1.2-.3 3L23 12l-1.7 2.6.3 3-2.8 1.2-1.2 2.8-3-.3L12 23l-2.6-1.7-3 .3-1.2-2.8-2.8-1.2.3-3L1 12l1.7-2.6-.3-3 2.8-1.2 1.2-2.8 3 .3L12 2Z" fill="oklch(0.74 0.15 85)"/><path d="M8.5 12.2l2.4 2.4 4.6-5.2" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div style="font-size: 13px; color: oklch(0.5 0.01 95); margin-top: 2px;">@novarobotics · Industrial Automation</div>
+            <div style="font-size: 14px; color: oklch(0.35 0.01 95); line-height: 1.5; margin-top: 10px;">We build warehouse robots that don't take themselves too seriously. Based in Austin, shipping worldwide.</div>
+            <div style="display: flex; gap: 22px; margin-top: 14px;">
+              <div><span style="font-weight: 700; font-size: 15px; color: oklch(0.17 0.01 95);">312</span> <span style="font-size: 13px; color: oklch(0.55 0.01 95);">posts</span></div>
+              <div><span style="font-weight: 700; font-size: 15px; color: oklch(0.17 0.01 95);">48.2K</span> <span style="font-size: 13px; color: oklch(0.55 0.01 95);">followers</span></div>
+              <div><span style="font-weight: 700; font-size: 15px; color: oklch(0.17 0.01 95);">210</span> <span style="font-size: 13px; color: oklch(0.55 0.01 95);">following</span></div>
+            </div>
+            <button onClick="{{ goScreen_analytics }}" style="margin-top: 14px; width: 100%; height: 44px; border-radius: 12px; background: oklch(0.96 0.005 95); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; font-size: 13px; color: oklch(0.35 0.01 95);">
+              <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 20V10M12 20V4M20 20v-7" stroke="oklch(0.6 0.14 78)" stroke-width="2.2" stroke-linecap="round"/></svg>
+              View Analytics
+            </button>
+            <div style="display: flex; gap: 24px; margin-top: 20px; border-bottom: 1px solid oklch(0.93 0.006 95);">
+              <div style="padding-bottom: 10px; font-weight: 700; font-size: 13px; color: oklch(0.17 0.01 95); border-bottom: 2px solid oklch(0.74 0.15 85);">Posts</div>
+              <div style="padding-bottom: 10px; font-weight: 600; font-size: 13px; color: oklch(0.55 0.01 95);">About</div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 12px;">
+              <sc-for list="{{ profileGrid }}" as="pg" hint-placeholder-count="6">
+                <div style="border-radius: 10px; overflow: hidden; aspect-ratio: 9/13;">
+                  <image-slot id="{{ pg.slotId }}" shape="rect" placeholder="{{ pg.placeholder }}" style="width: 100%; height: 100%;"></image-slot>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ANALYTICS -->
+    <sc-if value="{{ sAnalytics }}" hint-placeholder-val="{{ false }}">
+      <div style="height: 100%; width: 100%; background: oklch(0.98 0.004 90); display: flex; flex-direction: column;">
+        <div style="padding: 58px 20px 14px; display: flex; align-items: center; gap: 12px;">
+          <button onClick="{{ goScreen_profile }}" style="width: 34px; height: 34px; border-radius: 50%; background: #ffffff; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.06);">
+            <svg width="9" height="16" viewBox="0 0 12 20"><path d="M10 2 2 10l8 8" stroke="oklch(0.3 0.01 95)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px; color: oklch(0.17 0.01 95);">Analytics</div>
+        </div>
+        <div style="flex: 1; overflow: auto; padding: 4px 20px 40px; display: flex; flex-direction: column; gap: 14px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div style="background: #ffffff; border-radius: 16px; padding: 16px;">
+              <div style="font-size: 12px; color: oklch(0.55 0.01 95); font-weight: 600;">Views (30d)</div>
+              <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 24px; color: oklch(0.17 0.01 95); margin-top: 4px;">284K</div>
+              <div style="font-size: 11px; color: oklch(0.55 0.15 145); font-weight: 700; margin-top: 2px;">+22% vs last month</div>
+            </div>
+            <div style="background: #ffffff; border-radius: 16px; padding: 16px;">
+              <div style="font-size: 12px; color: oklch(0.55 0.01 95); font-weight: 600;">Engagement</div>
+              <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 24px; color: oklch(0.17 0.01 95); margin-top: 4px;">9.2%</div>
+              <div style="font-size: 11px; color: oklch(0.55 0.15 145); font-weight: 700; margin-top: 2px;">+3.1pt vs last month</div>
+            </div>
+          </div>
+          <div style="background: oklch(0.2 0.02 85); border-radius: 16px; padding: 18px; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <div style="font-size: 12px; color: oklch(0.8 0.03 85); font-weight: 600;">Creativity Score</div>
+              <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 30px; color: #ffffff; margin-top: 4px;">94<span style="font-size: 15px; color: oklch(0.8 0.03 85);"> / 100</span></div>
+              <div style="font-size: 11px; color: oklch(0.85 0.03 85); margin-top: 2px;">Top 4% of businesses on Verve</div>
+            </div>
+            <svg width="60" height="60" viewBox="0 0 60 60"><circle cx="30" cy="30" r="26" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="6"/><circle cx="30" cy="30" r="26" fill="none" stroke="oklch(0.74 0.15 85)" stroke-width="6" stroke-linecap="round" stroke-dasharray="163" stroke-dashoffset="16" transform="rotate(-90 30 30)"/></svg>
+          </div>
+          <div style="background: #ffffff; border-radius: 16px; padding: 18px;">
+            <div style="font-size: 13px; font-weight: 700; color: oklch(0.17 0.01 95); margin-bottom: 14px;">Weekly views</div>
+            <div style="display: flex; align-items: flex-end; gap: 10px; height: 100px;">
+              <sc-for list="{{ analyticsBars }}" as="b" hint-placeholder-count="6">
+                <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end;">
+                  <div style="{{ b.barStyle }}"></div>
+                  <div style="font-size: 10px; color: oklch(0.55 0.01 95);">{{ b.label }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="background: #ffffff; border-radius: 16px; padding: 16px; display: flex; align-items: center; gap: 12px;">
+            <div style="width: 44px; height: 44px; border-radius: 10px; background: oklch(0.93 0.05 90); flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+              <svg width="20" height="20" viewBox="0 0 24 24"><path d="M12 2 14.5 9H21l-5.2 4.3L17.8 21 12 16.8 6.2 21l2-7.7L3 9h6.5L12 2Z" fill="oklch(0.6 0.14 78)"/></svg>
+            </div>
+            <div>
+              <div style="font-size: 13px; font-weight: 700; color: oklch(0.17 0.01 95);">Top post: "Robot dances"</div>
+              <div style="font-size: 12px; color: oklch(0.55 0.01 95); margin-top: 1px;">96 score · 12.4K likes · 1.1K shares</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- MESSAGES -->
+    <sc-if value="{{ sMessages }}" hint-placeholder-val="{{ false }}">
+      <div style="height: 100%; width: 100%; background: #ffffff; display: flex; flex-direction: column;">
+        <div style="padding: 58px 20px 10px; display: flex; align-items: center; justify-content: space-between;">
+          <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 26px; color: oklch(0.17 0.01 95);">Messages</div>
+          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M4 4h13l3 3v13H4V4Z" fill="none" stroke="oklch(0.3 0.01 95)" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 9h8M8 13h5" stroke="oklch(0.3 0.01 95)" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </div>
+        <div style="flex: 1; overflow: auto; padding: 6px 12px 100px;">
+          <sc-for list="{{ threads }}" as="t" hint-placeholder-count="4">
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px 8px; border-radius: 12px;">
+              <div style="width: 48px; height: 48px; border-radius: 50%; background: oklch(0.92 0.03 85); flex-shrink: 0;"></div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 14px; font-weight: 700; color: oklch(0.17 0.01 95); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ t.name }}</div>
+                <div style="font-size: 13px; color: oklch(0.55 0.01 95); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ t.last }}</div>
+              </div>
+              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0;">
+                <div style="font-size: 11px; color: oklch(0.6 0.01 95);">{{ t.time }}</div>
+                <sc-if value="{{ t.unread }}" hint-placeholder-val="{{ false }}">
+                  <div style="width: 8px; height: 8px; border-radius: 50%; background: oklch(0.74 0.15 85);"></div>
+                </sc-if>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 84px; background: #ffffff; border-top: 1px solid oklch(0.93 0.006 95); display: flex; align-items: center; justify-content: space-around; padding-bottom: 14px;">
+          <button onClick="{{ goScreen_home }}" style="background: none; border: none; cursor: pointer;"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9h-6v-6h-4v6H4v-9Z" fill="none" stroke="oklch(0.65 0.01 95)" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+          <button onClick="{{ goScreen_discover }}" style="background: none; border: none; cursor: pointer;"><svg width="22" height="22" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="oklch(0.65 0.01 95)" stroke-width="1.8"/><path d="M16.2 16.2 21 21" stroke="oklch(0.65 0.01 95)" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+          <button onClick="{{ goScreen_compose }}" style="background: oklch(0.74 0.15 85); border: none; cursor: pointer; width: 44px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+          <button style="background: none; border: none; cursor: pointer;"><svg width="22" height="22" viewBox="0 0 24 22"><path d="M2 3h20v13H8l-6 5V3Z" fill="none" stroke="oklch(0.74 0.15 85)" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+          <button onClick="{{ goScreen_profile }}" style="background: none; border: none; cursor: pointer;"><svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="none" stroke="oklch(0.65 0.01 95)" stroke-width="1.8"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6" fill="none" stroke="oklch(0.65 0.01 95)" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- shared image-slot loader (ensures component registered) -->
+    <x-import component-from-global-scope="image-slot" from="./image-slot.js" hint-size="0,0" style="display:none"></x-import>
+
+    <!-- DISCOVER bottom nav -->
+    <sc-if value="{{ sDiscover }}" hint-placeholder-val="{{ false }}">
+      <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 84px; background: #ffffff; border-top: 1px solid oklch(0.93 0.006 95); display: flex; align-items: center; justify-content: space-around; padding-bottom: 14px;">
+        <button onClick="{{ goScreen_home }}" style="background: none; border: none; cursor: pointer;"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9h-6v-6h-4v6H4v-9Z" fill="none" stroke="oklch(0.65 0.01 95)" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+        <button style="background: none; border: none; cursor: pointer;"><svg width="22" height="22" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="oklch(0.74 0.15 85)" stroke-width="2"/><path d="M16.2 16.2 21 21" stroke="oklch(0.74 0.15 85)" stroke-width="2" stroke-linecap="round"/></svg></button>
+        <button onClick="{{ goScreen_compose }}" style="background: oklch(0.74 0.15 85); border: none; cursor: pointer; width: 44px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+        <button onClick="{{ goScreen_messages }}" style="background: none; border: none; cursor: pointer;"><svg width="22" height="22" viewBox="0 0 24 22"><path d="M2 3h20v13H8l-6 5V3Z" fill="none" stroke="oklch(0.65 0.01 95)" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+        <button onClick="{{ goScreen_profile }}" style="background: none; border: none; cursor: pointer;"><svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="none" stroke="oklch(0.65 0.01 95)" stroke-width="1.8"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6" fill="none" stroke="oklch(0.65 0.01 95)" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      </div>
+    </sc-if>
+
+    <!-- PROFILE bottom nav -->
+    <sc-if value="{{ sProfile }}" hint-placeholder-val="{{ false }}">
+      <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 84px; background: #ffffff; border-top: 1px solid oklch(0.93 0.006 95); display: flex; align-items: center; justify-content: space-around; padding-bottom: 14px;">
+        <button onClick="{{ goScreen_home }}" style="background: none; border: none; cursor: pointer;"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9h-6v-6h-4v6H4v-9Z" fill="none" stroke="oklch(0.65 0.01 95)" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+        <button onClick="{{ goScreen_discover }}" style="background: none; border: none; cursor: pointer;"><svg width="22" height="22" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="oklch(0.65 0.01 95)" stroke-width="1.8"/><path d="M16.2 16.2 21 21" stroke="oklch(0.65 0.01 95)" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+        <button onClick="{{ goScreen_compose }}" style="background: oklch(0.74 0.15 85); border: none; cursor: pointer; width: 44px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+        <button onClick="{{ goScreen_messages }}" style="background: none; border: none; cursor: pointer;"><svg width="22" height="22" viewBox="0 0 24 22"><path d="M2 3h20v13H8l-6 5V3Z" fill="none" stroke="oklch(0.65 0.01 95)" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+        <button style="background: none; border: none; cursor: pointer;"><svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="none" stroke="oklch(0.74 0.15 85)" stroke-width="2"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6" fill="none" stroke="oklch(0.74 0.15 85)" stroke-width="2" stroke-linecap="round"/></svg></button>
+      </div>
+    </sc-if>
+
+  </x-import>
+
+  <div style="font-size: 12px; color: oklch(0.55 0.01 95); text-align: center; max-width: 340px;">Tap the pill buttons above, or interact with the phone directly — bottom nav, feed tabs, and profile → analytics all navigate live.</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const POSTS = [
+  { id: 1, biz: 'Nova Robotics', handle: '@novarobotics', tag: 'Product Launch', caption: 'We taught a warehouse arm to dance. Turns out efficiency looks good with rhythm.', likes: '12.4K', comments: '842', shares: '1.1K', trending: true, score: 96, following: false },
+  { id: 2, biz: 'Fathom Analytics', handle: '@fathomhq', tag: 'Behind the Build', caption: 'Our engineers rebuilt the dashboard live on stage in 40 minutes. No cuts.', likes: '8.9K', comments: '503', shares: '640', trending: true, score: 91, following: true },
+  { id: 3, biz: 'Loop Logistics', handle: '@loopfreight', tag: 'Customer Story', caption: 'One client cut delivery time 30%. Here is the exact route we changed.', likes: '5.2K', comments: '298', shares: '410', trending: false, score: 78, following: false },
+  { id: 4, biz: 'Cinder Cloud', handle: '@cindercloud', tag: 'Culture', caption: 'Our on-call rotation now includes a trophy. Petty? Maybe. Effective? Very.', likes: '15.7K', comments: '1.3K', shares: '2K', trending: true, score: 98, following: true },
+];
+
+const DISCOVER = [
+  { biz: 'Nova Robotics', likes: '12.4K', trending: true, score: 96 },
+  { biz: 'Cinder Cloud', likes: '15.7K', trending: true, score: 98 },
+  { biz: 'Fathom Analytics', likes: '8.9K', trending: true, score: 91 },
+  { biz: 'BuildOps', likes: '4.1K', trending: false, score: 74 },
+  { biz: 'Anchorage Freight', likes: '3.6K', trending: false, score: 69 },
+  { biz: 'Loop Logistics', likes: '5.2K', trending: false, score: 78 },
+];
+
+const THREADS = [
+  { name: 'Priya Shah · Anchorage Freight', last: 'Loved the reel — can we get the raw cut?', time: '2m', unread: true },
+  { name: 'Dorian Fields · BuildOps', last: 'Sending the sponsorship deck now.', time: '1h', unread: false },
+  { name: 'Fathom Analytics', last: 'Thanks for the shoutout on stream.', time: '3h', unread: false },
+  { name: 'Nova Robotics', last: 'Can your team demo at our booth?', time: '1d', unread: true },
+];
+
+const COMMENTS = [
+  { who: 'Dorian · BuildOps', text: 'The transition at 0:12 is criminally good.' },
+  { who: 'Priya S.', text: 'Sending this to our whole marketing team.' },
+  { who: 'Cinder Cloud', text: "We need this energy. DM'ing you." },
+];
+
+const BAR_HEIGHTS = [40, 55, 48, 70, 65, 92];
+const BAR_LABELS = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6'];
+
+class Component extends DCLogic {
+  state = { screen: 'onboarding', feedTab: 'forYou', activePostId: 1 };
+
+  go(screen) { this.setState({ screen }); }
+
+  renderVals() {
+    const screens = ['onboarding', 'home', 'discover', 'compose', 'postDetail', 'profile', 'analytics', 'messages'];
+    const nav = {};
+    const pillBg = {};
+    const pillColor = {};
+    screens.forEach(s => {
+      nav['goScreen_' + s] = () => this.go(s);
+      const active = this.state.screen === s;
+      pillBg[s] = active ? 'oklch(0.74 0.15 85)' : 'oklch(0.96 0.005 95)';
+      pillColor[s] = active ? '#ffffff' : 'oklch(0.4 0.01 95)';
+    });
+
+    const active = POSTS.find(p => p.id === this.state.activePostId) || POSTS[0];
+    const forYouActive = this.state.feedTab === 'forYou';
+
+    const discoverPosts = DISCOVER.map((d, i) => ({
+      ...d,
+      slotId: 'discover-' + i,
+      placeholder: d.biz + ' — video',
+      open: () => this.setState({ activePostId: POSTS[i % POSTS.length].id, screen: 'postDetail' }),
+    }));
+
+    const profileGrid = Array.from({ length: 6 }).map((_, i) => ({
+      slotId: 'profile-grid-' + i,
+      placeholder: 'Post ' + (i + 1),
+    }));
+
+    const analyticsBars = BAR_HEIGHTS.map((h, i) => ({
+      label: BAR_LABELS[i],
+      barStyle: 'width: 100%; max-width: 22px; border-radius: 6px; height: ' + h + '%; background: ' + (i === BAR_HEIGHTS.length - 1 ? 'oklch(0.74 0.15 85)' : 'oklch(0.9 0.006 95)') + ';',
+    }));
+
+    const dark = { onboarding: false, home: true, discover: false, compose: false, postDetail: true, profile: false, analytics: false, messages: false };
+
+    return {
+      ...nav,
+      pillBg_onboarding: pillBg.onboarding, pillBg_home: pillBg.home, pillBg_discover: pillBg.discover, pillBg_compose: pillBg.compose, pillBg_postDetail: pillBg.postDetail, pillBg_profile: pillBg.profile, pillBg_analytics: pillBg.analytics, pillBg_messages: pillBg.messages,
+      pillColor_onboarding: pillColor.onboarding, pillColor_home: pillColor.home, pillColor_discover: pillColor.discover, pillColor_compose: pillColor.compose, pillColor_postDetail: pillColor.postDetail, pillColor_profile: pillColor.profile, pillColor_analytics: pillColor.analytics, pillColor_messages: pillColor.messages,
+      isDarkScreen: dark[this.state.screen],
+      sOnboarding: this.state.screen === 'onboarding',
+      sHome: this.state.screen === 'home',
+      sDiscover: this.state.screen === 'discover',
+      sCompose: this.state.screen === 'compose',
+      sPostDetail: this.state.screen === 'postDetail',
+      sProfile: this.state.screen === 'profile',
+      sAnalytics: this.state.screen === 'analytics',
+      sMessages: this.state.screen === 'messages',
+      setForYou: () => this.setState({ feedTab: 'forYou' }),
+      setFollowing: () => this.setState({ feedTab: 'following' }),
+      forYouTabColor: forYouActive ? '#ffffff' : 'rgba(255,255,255,0.6)',
+      forYouTabBorder: forYouActive ? 'oklch(0.74 0.15 85)' : 'transparent',
+      followingTabColor: !forYouActive ? '#ffffff' : 'rgba(255,255,255,0.6)',
+      followingTabBorder: !forYouActive ? 'oklch(0.74 0.15 85)' : 'transparent',
+      activePostBiz: active.biz,
+      activePostHandle: active.handle,
+      activePostTag: active.tag,
+      activePostCaption: active.caption,
+      activePostLikes: active.likes,
+      activePostComments: active.comments,
+      activePostShares: active.shares,
+      activePostTrending: active.trending,
+      activePostScore: active.score,
+      discoverPosts,
+      profileGrid,
+      threads: THREADS,
+      comments: COMMENTS,
+      analyticsBars,
+    };
+  }
+}
+
+</script>
+</body>
+</html>
