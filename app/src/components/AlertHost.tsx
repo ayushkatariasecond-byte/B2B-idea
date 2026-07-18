@@ -54,6 +54,7 @@ export function AlertHost() {
                     style={[styles.button, index > 0 && styles.buttonDivider]}
                     onPress={() => handlePress(button)}
                     accessibilityRole="button"
+                    accessibilityLabel={button.text}
                   >
                     <Text
                       style={[
