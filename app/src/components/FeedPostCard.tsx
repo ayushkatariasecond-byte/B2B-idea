@@ -79,9 +79,14 @@ export function FeedPostCard({ post, height, isActive, onToggleLike, onShare }: 
         onPress={() => navigation.navigate('BusinessProfile', { businessId: post.businessId })}
       >
         {post.trending && (
-          <View style={styles.trendingPill}>
+          <LinearGradient
+            colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.trendingPill}
+          >
             <Text style={styles.trendingText}>TRENDING · {post.score} SCORE</Text>
-          </View>
+          </LinearGradient>
         )}
         <Text style={styles.handle}>{'@' + post.business.handle}</Text>
         <Text style={styles.tag}>{post.tag}</Text>
@@ -103,10 +108,14 @@ const styles = StyleSheet.create({
   captionWrap: { position: 'absolute', left: 16, right: 90, bottom: 34 },
   trendingPill: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.gold,
     paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 100,
+    shadowColor: colors.splashGlow2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 3,
     marginBottom: 8,
   },
   trendingText: { color: colors.white, fontFamily: fonts.display.bold, fontSize: 11 },

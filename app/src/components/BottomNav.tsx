@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Icon } from './Icon';
@@ -45,14 +46,10 @@ export function BottomNav({ active, dark }: BottomNavProps) {
       >
         <Icon name="search" color={active === 'discover' ? activeColor : inactiveColor} size={22} strokeWidth={active === 'discover' ? 2 : 1.8} />
       </Pressable>
-      <Pressable
-        onPress={() => navigation.navigate('Compose')}
-        style={styles.composeButton}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel="Create a new post"
-      >
-        <Icon name="plus" color={colors.white} size={18} />
+      <Pressable onPress={() => navigation.navigate('Compose')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Create a new post">
+        <LinearGradient colors={[colors.gradientGoldStart, colors.gradientGoldEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.composeButton}>
+          <Icon name="plus" color={colors.white} size={18} />
+        </LinearGradient>
       </Pressable>
       <Pressable
         onPress={() => navigation.navigate('Tabs', { screen: 'Messages' } as never)}
@@ -95,11 +92,15 @@ const styles = StyleSheet.create({
   barLight: { backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.line },
   item: { alignItems: 'center', justifyContent: 'center' },
   composeButton: {
-    backgroundColor: colors.gold,
     width: 44,
     height: 34,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: colors.splashGlow2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 3,
   },
 });

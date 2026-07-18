@@ -1,5 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, fonts, radius } from '../theme/tokens';
 
 interface PrimaryButtonProps {
@@ -13,13 +14,41 @@ interface PrimaryButtonProps {
 
 export function PrimaryButton({ label, onPress, variant = 'primary', disabled, loading, style }: PrimaryButtonProps) {
   const isDisabled = disabled || loading;
+  const content = loading ? (
+    <ActivityIndicator color={variant === 'primary' ? colors.white : colors.ink} />
+  ) : (
+    <Text
+      style={[
+        styles.label,
+        variant === 'primary' && styles.labelPrimary,
+        variant === 'secondary' && styles.labelSecondary,
+        variant === 'ghost' && styles.labelGhost,
+      ]}
+    >
+      {label}
+    </Text>
+  );
+
+  if (variant === 'primary') {
+    return (
+      <Pressable
+        onPress={onPress}
+        disabled={isDisabled}
+        style={({ pressed }) => [styles.shadow, isDisabled && styles.disabled, pressed && !isDisabled && styles.pressed, style]}
+      >
+        <LinearGradient colors={[colors.gradientGoldStart, colors.gradientGoldEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.base}>
+          {content}
+        </LinearGradient>
+      </Pressable>
+    );
+  }
+
   return (
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.base,
-        variant === 'primary' && styles.primary,
         variant === 'secondary' && styles.secondary,
         variant === 'ghost' && styles.ghost,
         isDisabled && styles.disabled,
@@ -27,20 +56,7 @@ export function PrimaryButton({ label, onPress, variant = 'primary', disabled, l
         style,
       ]}
     >
-      {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? colors.white : colors.ink} />
-      ) : (
-        <Text
-          style={[
-            styles.label,
-            variant === 'primary' && styles.labelPrimary,
-            variant === 'secondary' && styles.labelSecondary,
-            variant === 'ghost' && styles.labelGhost,
-          ]}
-        >
-          {label}
-        </Text>
-      )}
+      {content}
     </Pressable>
   );
 }
@@ -52,7 +68,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primary: { backgroundColor: colors.gold },
+  shadow: {
+    borderRadius: radius.lg,
+    shadowColor: colors.splashGlow2,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 6,
+  },
   secondary: { backgroundColor: colors.paper2 },
   ghost: { backgroundColor: 'transparent' },
   disabled: { opacity: 0.5 },

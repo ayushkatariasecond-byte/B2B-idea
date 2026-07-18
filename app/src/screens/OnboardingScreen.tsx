@@ -1,6 +1,7 @@
 import React from 'react';
 import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { LinearGradient } from 'expo-linear-gradient';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, fonts } from '../theme/tokens';
 import { RootStackParamList } from '../navigation/types';
@@ -11,9 +12,14 @@ export function OnboardingScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.decorCardBack} />
-      <View style={styles.decorCardFront}>
+      <LinearGradient
+        colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.decorCardFront}
+      >
         <Text style={styles.decorText}>96 creativity score</Text>
-      </View>
+      </LinearGradient>
 
       <View style={styles.headlineWrap}>
         <Text style={styles.headline}>
@@ -57,10 +63,14 @@ const styles = StyleSheet.create({
     width: 190,
     height: 230,
     borderRadius: 24,
-    backgroundColor: colors.gold,
     transform: [{ rotate: '-6deg' }],
     justifyContent: 'flex-end',
     padding: 18,
+    shadowColor: colors.splashGlow2,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.3,
+    shadowRadius: 26,
+    elevation: 8,
   },
   decorText: { color: colors.white, fontFamily: fonts.display.bold, fontSize: 15, lineHeight: 20 },
   headlineWrap: { marginTop: 260 },

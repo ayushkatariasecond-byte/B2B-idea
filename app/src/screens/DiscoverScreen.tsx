@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Icon } from '../components/Icon';
@@ -143,9 +144,14 @@ export function DiscoverScreen() {
               <PostMedia uri={item.mediaUrl} mediaType={item.mediaType} thumbnailUri={item.thumbnailUrl} active={false} />
               <View style={[StyleSheet.absoluteFill, styles.tileScrim]} pointerEvents="none" />
               {item.trending && (
-                <View style={styles.scoreBadge}>
+                <LinearGradient
+                  colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.scoreBadge}
+                >
                   <Text style={styles.scoreBadgeText}>{item.score}</Text>
-                </View>
+                </LinearGradient>
               )}
               <View style={styles.tileCaption}>
                 <Text style={styles.tileBiz} numberOfLines={1}>
@@ -193,10 +199,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     left: 8,
-    backgroundColor: colors.gold,
     paddingVertical: 3,
     paddingHorizontal: 7,
     borderRadius: 100,
+    shadowColor: colors.splashGlow2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 2,
   },
   scoreBadgeText: { color: colors.white, fontSize: 10, fontFamily: fonts.display.bold },
   tileCaption: { position: 'absolute', bottom: 8, left: 8, right: 8 },
