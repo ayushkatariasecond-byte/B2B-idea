@@ -1,16 +1,48 @@
 import { Platform } from 'react-native';
 import { api } from './client';
-import { Comment, Post } from './types';
+import { Comment, Post, PostStatus, TrendingTag } from './types';
 
 export function getFeed(tab: 'forYou' | 'following', page = 1) {
   return api.get<{ posts: Post[]; page: number; hasMore: boolean }>(`/posts/feed?tab=${tab}&page=${page}`);
 }
 
-export function discover(params: { tag?: string; q?: string }) {
+export function discover(params: { tag?: string; q?: string; hashtag?: string }) {
   const search = new URLSearchParams();
   if (params.tag) search.set('tag', params.tag);
   if (params.q) search.set('q', params.q);
+  if (params.hashtag) search.set('hashtag', params.hashtag);
   return api.get<{ posts: Post[] }>(`/posts/discover?${search.toString()}`);
+}
+
+export function getTrendingTags() {
+  return api.get<{ tags: TrendingTag[] }>('/posts/trending-tags');
+}
+
+export function getDrafts() {
+  return api.get<{ posts: Post[] }>('/posts/mine/drafts');
+}
+
+export function getSaved() {
+  return api.get<{ posts: Post[] }>('/posts/saved');
+}
+
+export function toggleSave(postId: string) {
+  return api.post<{ saved: boolean }>(`/posts/${postId}/save`);
+}
+
+export function updatePost(
+  postId: string,
+  input: { caption?: string; tag?: string; status?: PostStatus; scheduledFor?: string | null }
+) {
+  return api.patch<{ post: Post }>(`/posts/${postId}`, input);
+}
+
+export function deletePost(postId: string) {
+  return api.delete<{ ok: boolean }>(`/posts/${postId}`);
+}
+
+export function deleteComment(postId: string, commentId: string) {
+  return api.delete<{ ok: boolean }>(`/posts/${postId}/comments/${commentId}`);
 }
 
 export function getPost(id: string) {
@@ -41,10 +73,14 @@ export async function createPost(input: {
   caption: string;
   tag: string;
   thumbnail?: FilePart;
+  status?: PostStatus;
+  scheduledFor?: string;
 }) {
   const form = new FormData();
   form.append('caption', input.caption);
   form.append('tag', input.tag);
+  if (input.status) form.append('status', input.status);
+  if (input.scheduledFor) form.append('scheduledFor', input.scheduledFor);
   await appendFile(form, 'media', input);
   if (input.thumbnail) await appendFile(form, 'thumbnail', input.thumbnail);
 

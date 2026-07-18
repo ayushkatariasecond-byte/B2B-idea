@@ -8,6 +8,8 @@ type BusinessLike = {
   bio: string;
   avatarUrl: string | null;
   coverUrl: string | null;
+  verified: boolean;
+  verificationRequested: boolean;
   createdAt: Date;
 };
 
@@ -20,6 +22,8 @@ export function serializeBusiness(b: BusinessLike, extra: Record<string, unknown
     bio: b.bio,
     avatarUrl: b.avatarUrl,
     coverUrl: b.coverUrl,
+    verified: b.verified,
+    verificationRequested: b.verificationRequested,
     createdAt: b.createdAt,
     ...extra,
   };
@@ -35,9 +39,12 @@ type PostWithRelations = {
   caption: string;
   tag: string;
   shareCount: number;
+  status: string;
+  scheduledFor: Date | null;
   createdAt: Date;
   _count: { likes: number; comments: number };
   likes?: { id: string }[];
+  savedBy?: { id: string }[];
 };
 
 export function serializePost(post: PostWithRelations) {
@@ -66,6 +73,9 @@ export function serializePost(post: PostWithRelations) {
     score,
     trending: score >= TRENDING_THRESHOLD,
     likedByMe: Boolean(post.likes && post.likes.length > 0),
+    savedByMe: Boolean(post.savedBy && post.savedBy.length > 0),
+    status: post.status,
+    scheduledFor: post.scheduledFor,
     createdAt: post.createdAt,
   };
 }

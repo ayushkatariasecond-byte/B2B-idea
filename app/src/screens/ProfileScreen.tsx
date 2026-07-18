@@ -1,14 +1,17 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BusinessProfileContent } from '../components/BusinessProfileContent';
 import { BottomNav } from '../components/BottomNav';
+import { Icon } from '../components/Icon';
 import { colors, fonts, radius } from '../theme/tokens';
 import { useAuth } from '../context/AuthContext';
 import { Business, Post } from '../api/types';
 import * as businessesApi from '../api/businesses';
+import * as notificationsApi from '../api/notifications';
 import { RootStackParamList } from '../navigation/types';
+import { alert } from '../utils/alert';
 
 export function ProfileScreen() {
   const { business: me } = useAuth();
@@ -16,12 +19,18 @@ export function ProfileScreen() {
   const [business, setBusiness] = useState<Business | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const load = useCallback(async () => {
     if (!me) return;
-    const [businessRes, postsRes] = await Promise.all([businessesApi.getBusiness(me.id), businessesApi.getBusinessPosts(me.id)]);
+    const [businessRes, postsRes, unreadRes] = await Promise.all([
+      businessesApi.getBusiness(me.id),
+      businessesApi.getBusinessPosts(me.id),
+      notificationsApi.getUnreadCount(),
+    ]);
     setBusiness(businessRes.business);
     setPosts(postsRes.posts);
+    setUnreadCount(unreadRes.count);
     setLoading(false);
   }, [me]);
 
@@ -30,6 +39,17 @@ export function ProfileScreen() {
       load();
     }, [load])
   );
+
+  const showMoreMenu = () => {
+    alert('More', undefined, [
+      { text: `Notifications${unreadCount > 0 ? ` (${unreadCount})` : ''}`, onPress: () => navigation.navigate('Notifications') },
+      { text: 'Drafts & Scheduled', onPress: () => navigation.navigate('Drafts') },
+      { text: 'Saved', onPress: () => navigation.navigate('Saved') },
+      { text: 'Team', onPress: () => navigation.navigate('TeamMembers') },
+      { text: 'Settings', onPress: () => navigation.navigate('Settings') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
 
   if (loading || !business) {
     return (
@@ -45,8 +65,14 @@ export function ProfileScreen() {
         business={business}
         posts={posts}
         headerAction={
-          <Pressable style={styles.editButton} onPress={() => navigation.navigate('EditProfile')}>
+          <Pressable style={styles.editButton} onPress={() => navigation.navigate('EditProfile')} accessibilityRole="button">
             <Text style={styles.editButtonText}>Edit profile</Text>
+          </Pressable>
+        }
+        moreAction={
+          <Pressable style={styles.moreButton} onPress={showMoreMenu} hitSlop={8} accessibilityLabel="More options" accessibilityRole="button">
+            <Icon name="moreDots" color={colors.white} size={16} />
+            {unreadCount > 0 && <View style={styles.unreadDot} />}
           </Pressable>
         }
       />
@@ -66,4 +92,23 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   editButtonText: { fontWeight: '700', fontSize: 13, color: colors.ink, fontFamily: fonts.body.bold },
+  moreButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadDot: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: colors.gold,
+    borderWidth: 1.5,
+    borderColor: colors.white,
+  },
 });

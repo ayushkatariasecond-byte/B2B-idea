@@ -39,7 +39,7 @@ export function AnalyticsScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => navigation.goBack()} hitSlop={10}>
+        <Pressable style={styles.backButton} onPress={() => navigation.goBack()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Go back">
           <Icon name="chevronLeft" color={colors.backIcon} size={9} />
         </Pressable>
         <Text style={styles.headerTitle}>Analytics</Text>

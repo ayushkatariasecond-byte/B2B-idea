@@ -2,6 +2,7 @@ export type RootStackParamList = {
   Onboarding: undefined;
   Signup: undefined;
   Login: undefined;
+  SuggestedFollows: undefined;
   Tabs: undefined;
   Compose: undefined;
   PostDetail: { postId: string };
@@ -9,6 +10,11 @@ export type RootStackParamList = {
   EditProfile: undefined;
   Analytics: undefined;
   Thread: { threadId: string; otherName: string };
+  Notifications: undefined;
+  Drafts: undefined;
+  TeamMembers: undefined;
+  Saved: undefined;
+  Settings: undefined;
 };
 
 export type TabParamList = {

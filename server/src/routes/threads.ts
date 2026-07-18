@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
+import { notify } from '../utils/notifications';
 
 export const threadsRouter = Router();
 
@@ -60,6 +61,16 @@ threadsRouter.post('/', requireAuth, async (req: AuthedRequest, res) => {
   const other = await prisma.business.findUnique({ where: { id: otherId } });
   if (!other) return res.status(404).json({ error: 'Business not found' });
 
+  const blocked = await prisma.block.findFirst({
+    where: {
+      OR: [
+        { blockerId: meId, blockedId: otherId },
+        { blockerId: otherId, blockedId: meId },
+      ],
+    },
+  });
+  if (blocked) return res.status(403).json({ error: "You can't message this business" });
+
   const [a, b] = [meId, otherId].sort();
   let thread = await prisma.thread.findUnique({ where: { participantAId_participantBId: { participantAId: a, participantBId: b } } });
   if (!thread) {
@@ -96,5 +107,7 @@ threadsRouter.post('/:id/messages', requireAuth, async (req: AuthedRequest, res)
   if (!thread) return res.status(404).json({ error: 'Thread not found' });
 
   const message = await prisma.message.create({ data: { threadId: thread.id, senderId: meId, text: parsed.data.text } });
+  const recipientId = thread.participantAId === meId ? thread.participantBId : thread.participantAId;
+  void notify({ recipientId, actorId: meId, type: 'message', threadId: thread.id });
   res.status(201).json({ message: { id: message.id, text: message.text, senderId: message.senderId, createdAt: message.createdAt, mine: true } });
 });

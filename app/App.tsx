@@ -1,13 +1,29 @@
 import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
+import { LinkingOptions, NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/context/AuthContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { ResponsiveContainer } from './src/components/ResponsiveContainer';
+import { AlertHost } from './src/components/AlertHost';
 import { useAppFonts } from './src/theme/useAppFonts';
 import { colors } from './src/theme/tokens';
+import { RootStackParamList } from './src/navigation/types';
+
+// Public post/profile pages get real URLs; everything else stays app-only (no useful state to deep-link into pre-auth).
+const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: [],
+  config: {
+    screens: {
+      Onboarding: '',
+      Signup: 'signup',
+      Login: 'login',
+      PostDetail: 'post/:postId',
+      BusinessProfile: 'biz/:businessId',
+    } as never,
+  },
+};
 
 export default function App() {
   const [fontsLoaded] = useAppFonts();
@@ -24,10 +40,11 @@ export default function App() {
     <SafeAreaProvider>
       <ResponsiveContainer>
         <AuthProvider>
-          <NavigationContainer>
+          <NavigationContainer linking={linking}>
             <RootNavigator />
             <StatusBar style="light" />
           </NavigationContainer>
+          <AlertHost />
         </AuthProvider>
       </ResponsiveContainer>
     </SafeAreaProvider>

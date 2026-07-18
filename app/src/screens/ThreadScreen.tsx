@@ -50,7 +50,7 @@ export function ThreadScreen({ route, navigation }: Props) {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SafeAreaView style={styles.header} edges={['top']}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={10}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Go back">
           <Icon name="chevronLeft" color={colors.backIcon} size={9} />
         </Pressable>
         <Text style={styles.headerTitle}>{otherName}</Text>
@@ -81,7 +81,7 @@ export function ThreadScreen({ route, navigation }: Props) {
           onChangeText={setText}
           onSubmitEditing={send}
         />
-        <Pressable style={styles.sendButton} onPress={send} disabled={sending} hitSlop={8}>
+        <Pressable style={styles.sendButton} onPress={send} disabled={sending} hitSlop={8} accessibilityRole="button" accessibilityLabel="Send message">
           <Icon name="send" color={colors.white} size={16} />
         </Pressable>
       </View>

@@ -8,16 +8,19 @@ datasource db {
 }
 
 model Business {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String
-  handle       String   @unique
-  category     String
-  bio          String   @default("")
-  avatarUrl    String?
-  coverUrl     String?
-  createdAt    DateTime @default(now())
+  id                     String   @id @default(cuid())
+  email                  String   @unique
+  passwordHash           String
+  name                   String
+  handle                 String   @unique
+  category               String
+  bio                    String   @default("")
+  avatarUrl              String?
+  coverUrl               String?
+  verified               Boolean  @default(false)
+  verificationRequested  Boolean  @default(false)
+  expoPushToken          String?
+  createdAt              DateTime @default(now())
 
   posts           Post[]
   likes           Like[]
@@ -28,6 +31,25 @@ model Business {
   sentMessages    Message[]
   threadsAsA      Thread[]        @relation("ThreadA")
   threadsAsB      Thread[]        @relation("ThreadB")
+  members         BusinessMember[]
+  notificationsReceived Notification[] @relation("NotificationRecipient")
+  notificationsActed    Notification[] @relation("NotificationActor")
+  savedPosts      SavedPost[]
+  blocksMade      Block[]         @relation("Blocker")
+  blocksReceived  Block[]         @relation("Blocked")
+  reportsFiled    Report[]
+}
+
+model BusinessMember {
+  id           String   @id @default(cuid())
+  businessId   String
+  business     Business @relation(fields: [businessId], references: [id])
+  email        String   @unique
+  passwordHash String
+  role         String   @default("editor") // "editor" (owner is the Business row itself)
+  createdAt    DateTime @default(now())
+
+  @@index([businessId])
 }
 
 model Post {
@@ -40,14 +62,85 @@ model Post {
   caption         String
   tag             String
   shareCount      Int      @default(0)
+  status          String   @default("published") // "draft" | "scheduled" | "published"
+  scheduledFor    DateTime?
   createdAt       DateTime @default(now())
 
-  likes    Like[]
-  comments Comment[]
-  views    PostView[]
+  likes     Like[]
+  comments  Comment[]
+  views     PostView[]
+  hashtags  PostHashtag[]
+  savedBy   SavedPost[]
 
   @@index([businessId])
   @@index([tag])
+  @@index([status])
+}
+
+model Hashtag {
+  id    String @id @default(cuid())
+  tag   String @unique
+
+  posts PostHashtag[]
+}
+
+model PostHashtag {
+  id        String  @id @default(cuid())
+  postId    String
+  post      Post    @relation(fields: [postId], references: [id])
+  hashtagId String
+  hashtag   Hashtag @relation(fields: [hashtagId], references: [id])
+
+  @@unique([postId, hashtagId])
+  @@index([hashtagId])
+}
+
+model SavedPost {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id])
+  postId     String
+  post       Post     @relation(fields: [postId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@unique([businessId, postId])
+}
+
+model Block {
+  id         String   @id @default(cuid())
+  blockerId  String
+  blocker    Business @relation("Blocker", fields: [blockerId], references: [id])
+  blockedId  String
+  blocked    Business @relation("Blocked", fields: [blockedId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+}
+
+model Report {
+  id         String   @id @default(cuid())
+  reporterId String
+  reporter   Business @relation(fields: [reporterId], references: [id])
+  targetType String   // "post" | "comment" | "business"
+  targetId   String
+  reason     String
+  createdAt  DateTime @default(now())
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  recipientId String
+  recipient   Business @relation("NotificationRecipient", fields: [recipientId], references: [id])
+  actorId     String?
+  actor       Business? @relation("NotificationActor", fields: [actorId], references: [id])
+  type        String   // "like" | "comment" | "follow" | "message"
+  postId      String?
+  threadId    String?
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([recipientId])
+  @@index([recipientId, read])
 }
 
 model Like {

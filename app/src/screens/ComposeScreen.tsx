@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
@@ -12,12 +12,42 @@ import { POST_TAGS } from '../api/types';
 import * as postsApi from '../api/posts';
 import { ApiError } from '../api/client';
 import { generateVideoThumbnail, ThumbnailFile } from '../utils/videoThumbnail';
+import { alert } from '../utils/alert';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Compose'>;
 
 function isVideoAsset(asset: ImagePicker.ImagePickerAsset): boolean {
   return asset.type === 'video' || /\.(mp4|mov|m4v|webm)$/i.test(asset.uri);
 }
+
+type PostMode = 'now' | 'draft' | 'schedule';
+
+interface SchedulePreset {
+  label: string;
+  compute: () => Date;
+}
+
+const SCHEDULE_PRESETS: SchedulePreset[] = [
+  { label: 'In 1 hour', compute: () => new Date(Date.now() + 60 * 60 * 1000) },
+  {
+    label: 'Tonight 6pm',
+    compute: () => {
+      const d = new Date();
+      d.setHours(18, 0, 0, 0);
+      if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+      return d;
+    },
+  },
+  {
+    label: 'Tomorrow 9am',
+    compute: () => {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      d.setHours(9, 0, 0, 0);
+      return d;
+    },
+  },
+];
 
 export function ComposeScreen({ navigation }: Props) {
   const [media, setMedia] = useState<ImagePicker.ImagePickerAsset | null>(null);
@@ -26,13 +56,15 @@ export function ComposeScreen({ navigation }: Props) {
   const [caption, setCaption] = useState('');
   const [tag, setTag] = useState(POST_TAGS[0]);
   const [posting, setPosting] = useState(false);
+  const [mode, setMode] = useState<PostMode>('now');
+  const [scheduledFor, setScheduledFor] = useState<Date | null>(null);
 
   const isVideo = media ? isVideoAsset(media) : false;
 
   const pickMedia = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permission needed', 'Allow photo library access to attach media.');
+      alert('Permission needed', 'Allow photo library access to attach media.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -55,7 +87,11 @@ export function ComposeScreen({ navigation }: Props) {
 
   const submit = async () => {
     if (!media) {
-      Alert.alert('Add media', 'Pick a photo or video before posting.');
+      alert('Add media', 'Pick a photo or video before posting.');
+      return;
+    }
+    if (mode === 'schedule' && !scheduledFor) {
+      alert('Pick a time', 'Choose when this post should go out.');
       return;
     }
     setPosting(true);
@@ -67,14 +103,18 @@ export function ComposeScreen({ navigation }: Props) {
         caption,
         tag,
         thumbnail: thumbnail ?? undefined,
+        status: mode === 'now' ? 'published' : mode === 'draft' ? 'draft' : 'scheduled',
+        scheduledFor: mode === 'schedule' ? scheduledFor!.toISOString() : undefined,
       });
       navigation.goBack();
     } catch (e) {
-      Alert.alert('Couldn’t post', e instanceof ApiError ? e.message : 'Something went wrong. Please try again.');
+      alert('Couldn’t post', e instanceof ApiError ? e.message : 'Something went wrong. Please try again.');
     } finally {
       setPosting(false);
     }
   };
+
+  const actionLabel = { now: 'Post', draft: 'Save Draft', schedule: 'Schedule' }[mode];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -83,8 +123,13 @@ export function ComposeScreen({ navigation }: Props) {
           <Text style={styles.cancel}>Cancel</Text>
         </Pressable>
         <Text style={styles.headerTitle}>New Post</Text>
-        <Pressable style={[styles.postButton, posting && styles.postButtonDisabled]} onPress={submit} disabled={posting}>
-          <Text style={styles.postButtonText}>{posting ? 'Posting…' : 'Post'}</Text>
+        <Pressable
+          style={[styles.postButton, posting && styles.postButtonDisabled]}
+          onPress={submit}
+          disabled={posting}
+          accessibilityRole="button"
+        >
+          <Text style={styles.postButtonText}>{posting ? 'Saving…' : actionLabel}</Text>
         </Pressable>
       </View>
 
@@ -135,6 +180,36 @@ export function ComposeScreen({ navigation }: Props) {
               <Chip key={t} label={t} active={t === tag} onPress={() => setTag(t)} />
             ))}
           </View>
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>When</Text>
+          <View style={styles.tagRow}>
+            <Chip label="Post now" active={mode === 'now'} onPress={() => setMode('now')} />
+            <Chip label="Save as draft" active={mode === 'draft'} onPress={() => setMode('draft')} />
+            <Chip label="Schedule for later" active={mode === 'schedule'} onPress={() => setMode('schedule')} />
+          </View>
+          {mode === 'schedule' && (
+            <View style={styles.scheduleRow}>
+              {SCHEDULE_PRESETS.map((preset) => {
+                const presetDate = preset.compute();
+                const active = scheduledFor?.getTime() === presetDate.getTime();
+                return (
+                  <Chip
+                    key={preset.label}
+                    label={preset.label}
+                    active={active}
+                    onPress={() => setScheduledFor(preset.compute())}
+                  />
+                );
+              })}
+            </View>
+          )}
+          {mode === 'schedule' && scheduledFor && (
+            <Text style={styles.scheduleConfirm}>
+              Will post {scheduledFor.toLocaleDateString()} at {scheduledFor.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+            </Text>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -193,4 +268,6 @@ const styles = StyleSheet.create({
   tipTitle: { fontSize: 13, fontFamily: fonts.body.bold, color: colors.tipTitle },
   tipSubtitle: { fontSize: 12, color: colors.tipSubtitle, marginTop: 1, fontFamily: fonts.body.regular },
   tagRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  scheduleRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 10 },
+  scheduleConfirm: { fontSize: 12, color: colors.inkSoft, marginTop: 8, fontFamily: fonts.body.medium },
 });

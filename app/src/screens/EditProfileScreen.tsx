@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -11,6 +11,7 @@ import { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../context/AuthContext';
 import * as businessesApi from '../api/businesses';
 import { ApiError } from '../api/client';
+import { alert } from '../utils/alert';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
 
@@ -40,7 +41,7 @@ export function EditProfileScreen({ navigation }: Props) {
       setAvatarUrl(res.business.avatarUrl);
       setBusiness(res.business);
     } catch (e) {
-      Alert.alert('Upload failed', e instanceof ApiError ? e.message : 'Please try again.');
+      alert('Upload failed', e instanceof ApiError ? e.message : 'Please try again.');
     }
   };
 
@@ -65,14 +66,14 @@ export function EditProfileScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()}>
+        <Pressable onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Cancel">
           <Text style={styles.cancel}>Cancel</Text>
         </Pressable>
         <Text style={styles.headerTitle}>Edit Profile</Text>
         <View style={{ width: 50 }} />
       </View>
       <ScrollView contentContainerStyle={styles.body}>
-        <Pressable style={styles.avatarWrap} onPress={pickAvatar}>
+        <Pressable style={styles.avatarWrap} onPress={pickAvatar} accessibilityRole="button" accessibilityLabel="Change business logo">
           <Avatar uri={avatarUrl} name={name || business.name} size={88} />
           <Text style={styles.avatarHint}>Change logo</Text>
         </Pressable>

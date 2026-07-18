@@ -50,7 +50,7 @@ export function BusinessProfileContent({ business, posts, headerAction, moreActi
 
             <View style={styles.nameRow}>
               <Text style={styles.name}>{business.name}</Text>
-              <Icon name="checkBadge" color={colors.gold} size={16} />
+              {business.verified && <Icon name="checkBadge" color={colors.gold} size={16} />}
             </View>
             <Text style={styles.handle}>
               {'@' + business.handle} · {business.category}

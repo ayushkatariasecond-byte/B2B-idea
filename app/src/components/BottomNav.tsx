@@ -25,19 +25,53 @@ export function BottomNav({ active, dark }: BottomNavProps) {
 
   return (
     <Container {...containerProps} style={[styles.bar, dark ? styles.barDark : styles.barLight]}>
-      <Pressable onPress={() => navigation.navigate('Tabs', { screen: 'HomeFeed' } as never)} style={styles.item} hitSlop={8}>
+      <Pressable
+        onPress={() => navigation.navigate('Tabs', { screen: 'HomeFeed' } as never)}
+        style={styles.item}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Home"
+        accessibilityState={{ selected: active === 'home' }}
+      >
         <Icon name={active === 'home' ? 'homeFilled' : 'home'} color={active === 'home' ? activeColor : inactiveColor} size={24} />
       </Pressable>
-      <Pressable onPress={() => navigation.navigate('Tabs', { screen: 'Discover' } as never)} style={styles.item} hitSlop={8}>
+      <Pressable
+        onPress={() => navigation.navigate('Tabs', { screen: 'Discover' } as never)}
+        style={styles.item}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Discover"
+        accessibilityState={{ selected: active === 'discover' }}
+      >
         <Icon name="search" color={active === 'discover' ? activeColor : inactiveColor} size={22} strokeWidth={active === 'discover' ? 2 : 1.8} />
       </Pressable>
-      <Pressable onPress={() => navigation.navigate('Compose')} style={styles.composeButton} hitSlop={8}>
+      <Pressable
+        onPress={() => navigation.navigate('Compose')}
+        style={styles.composeButton}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Create a new post"
+      >
         <Icon name="plus" color={colors.white} size={18} />
       </Pressable>
-      <Pressable onPress={() => navigation.navigate('Tabs', { screen: 'Messages' } as never)} style={styles.item} hitSlop={8}>
+      <Pressable
+        onPress={() => navigation.navigate('Tabs', { screen: 'Messages' } as never)}
+        style={styles.item}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Messages"
+        accessibilityState={{ selected: active === 'messages' }}
+      >
         <Icon name="comment" color={active === 'messages' ? activeColor : inactiveColor} size={22} strokeWidth={active === 'messages' ? 2 : 1.8} />
       </Pressable>
-      <Pressable onPress={() => navigation.navigate('Tabs', { screen: 'ProfileTab' } as never)} style={styles.item} hitSlop={8}>
+      <Pressable
+        onPress={() => navigation.navigate('Tabs', { screen: 'ProfileTab' } as never)}
+        style={styles.item}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Profile"
+        accessibilityState={{ selected: active === 'profile' }}
+      >
         <Icon name="profile" color={active === 'profile' ? activeColor : inactiveColor} size={22} strokeWidth={active === 'profile' ? 2 : 1.8} />
       </Pressable>
     </Container>

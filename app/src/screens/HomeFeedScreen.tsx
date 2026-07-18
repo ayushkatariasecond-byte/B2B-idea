@@ -106,10 +106,10 @@ export function HomeFeedScreen() {
 
       <SafeAreaView style={styles.tabsWrap} edges={['top']} pointerEvents="box-none">
         <View style={styles.tabsRow}>
-          <Pressable onPress={() => setTab('following')}>
+          <Pressable onPress={() => setTab('following')} accessibilityRole="tab" accessibilityState={{ selected: tab === 'following' }}>
             <Text style={[styles.tabLabel, tab === 'following' ? styles.tabActive : styles.tabInactive]}>Following</Text>
           </Pressable>
-          <Pressable onPress={() => setTab('forYou')}>
+          <Pressable onPress={() => setTab('forYou')} accessibilityRole="tab" accessibilityState={{ selected: tab === 'forYou' }}>
             <Text style={[styles.tabLabel, tab === 'forYou' ? styles.tabActive : styles.tabInactive]}>For You</Text>
           </Pressable>
         </View>

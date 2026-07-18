@@ -4,6 +4,7 @@ import { Business } from './types';
 export interface AuthResponse {
   token: string;
   business: Business;
+  memberRole?: string;
 }
 
 export function signup(input: { email: string; password: string; name: string; handle: string; category: string; bio?: string }) {
@@ -15,5 +16,5 @@ export function login(input: { email: string; password: string }) {
 }
 
 export function me() {
-  return api.get<{ business: Business }>('/auth/me');
+  return api.get<{ business: Business; isOwner: boolean }>('/auth/me');
 }

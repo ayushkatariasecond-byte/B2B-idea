@@ -6,6 +6,8 @@ export interface Business {
   bio: string;
   avatarUrl: string | null;
   coverUrl: string | null;
+  verified: boolean;
+  verificationRequested: boolean;
   createdAt: string;
   postCount?: number;
   followerCount?: number;
@@ -13,6 +15,8 @@ export interface Business {
   isFollowedByMe?: boolean;
   isMe?: boolean;
 }
+
+export type PostStatus = 'draft' | 'scheduled' | 'published';
 
 export interface Post {
   id: string;
@@ -29,6 +33,9 @@ export interface Post {
   score: number;
   trending: boolean;
   likedByMe: boolean;
+  savedByMe: boolean;
+  status: PostStatus;
+  scheduledFor: string | null;
   createdAt: string;
 }
 
@@ -64,6 +71,30 @@ export interface AnalyticsResponse {
   percentileTop: number;
   weeklyViews: { label: string; count: number; heightPct: number; isCurrent: boolean }[];
   topPost: { id: string; caption: string; score: number; likeCount: number; shareCount: number } | null;
+}
+
+export type NotificationType = 'like' | 'comment' | 'follow' | 'message';
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  postId: string | null;
+  threadId: string | null;
+  read: boolean;
+  createdAt: string;
+  actor: Pick<Business, 'id' | 'name' | 'handle' | 'avatarUrl'> | null;
+}
+
+export interface TeamMember {
+  id: string;
+  email: string;
+  role: string;
+  createdAt: string;
+}
+
+export interface TrendingTag {
+  tag: string;
+  count: number;
 }
 
 export const POST_TAGS = ['Product Launch', 'Culture', 'Case Study', 'Behind the Build', 'Customer Story'];

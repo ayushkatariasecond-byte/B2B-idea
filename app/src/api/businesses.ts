@@ -32,6 +32,34 @@ export function toggleFollow(businessId: string) {
   return api.post<{ following: boolean; followerCount: number }>(`/businesses/${businessId}/follow`);
 }
 
+export function toggleBlock(businessId: string) {
+  return api.post<{ blocked: boolean }>(`/businesses/${businessId}/block`);
+}
+
 export function getBusinessPosts(businessId: string) {
   return api.get<{ posts: Post[] }>(`/businesses/${businessId}/posts`);
+}
+
+export function searchBusinesses(q: string) {
+  return api.get<{ businesses: Business[] }>(`/businesses/search?q=${encodeURIComponent(q)}`);
+}
+
+export function getSuggested() {
+  return api.get<{ businesses: Business[] }>('/businesses/suggested');
+}
+
+export function registerPushToken(token: string | null) {
+  return api.post<{ ok: boolean }>('/businesses/me/push-token', { token });
+}
+
+export function requestVerification() {
+  return api.post<{ business: Business }>('/businesses/me/request-verification');
+}
+
+export function exportMyData() {
+  return api.get<Record<string, unknown>>('/businesses/me/export');
+}
+
+export function deleteMyAccount() {
+  return api.delete<{ ok: boolean }>('/businesses/me');
 }

@@ -18,8 +18,10 @@ analyticsRouter.get('/me', requireAuth, async (req: AuthedRequest, res) => {
   const d30 = new Date(now - 30 * DAY_MS);
   const d60 = new Date(now - 60 * DAY_MS);
 
+  const visible = { OR: [{ status: 'published' }, { status: 'scheduled', scheduledFor: { lte: new Date() } }] };
+
   const myPosts = await prisma.post.findMany({
-    where: { businessId },
+    where: { businessId, ...visible },
     include: { _count: { select: { likes: true, comments: true } } },
   });
   const myPostIds = myPosts.map((p) => p.id);
@@ -50,6 +52,7 @@ analyticsRouter.get('/me', requireAuth, async (req: AuthedRequest, res) => {
 
   // Percentile vs every business that has at least one post.
   const allBusinessPosts = await prisma.post.findMany({
+    where: visible,
     include: { _count: { select: { likes: true, comments: true } } },
   });
   const scoreByBusiness = new Map<string, number[]>();

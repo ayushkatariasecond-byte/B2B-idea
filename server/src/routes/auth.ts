@@ -38,7 +38,7 @@ authRouter.post('/signup', async (req, res) => {
     data: { email, passwordHash, name, handle, category, bio },
   });
 
-  const token = signToken(business.id);
+  const token = signToken(business.id, null);
   res.status(201).json({ token, business: serializeBusiness(business) });
 });
 
@@ -55,17 +55,29 @@ authRouter.post('/login', async (req, res) => {
   const { email, password } = parsed.data;
 
   const business = await prisma.business.findUnique({ where: { email } });
-  if (!business) return res.status(401).json({ error: 'Invalid email or password' });
+  if (business) {
+    const ok = await bcrypt.compare(password, business.passwordHash);
+    if (!ok) return res.status(401).json({ error: 'Invalid email or password' });
+    const token = signToken(business.id, null);
+    return res.json({ token, business: serializeBusiness(business) });
+  }
 
-  const ok = await bcrypt.compare(password, business.passwordHash);
+  // Not the owner's email — check if it belongs to an invited team member instead.
+  const member = await prisma.businessMember.findUnique({ where: { email } });
+  if (!member) return res.status(401).json({ error: 'Invalid email or password' });
+
+  const ok = await bcrypt.compare(password, member.passwordHash);
   if (!ok) return res.status(401).json({ error: 'Invalid email or password' });
 
-  const token = signToken(business.id);
-  res.json({ token, business: serializeBusiness(business) });
+  const memberBusiness = await prisma.business.findUnique({ where: { id: member.businessId } });
+  if (!memberBusiness) return res.status(401).json({ error: 'Invalid email or password' });
+
+  const token = signToken(memberBusiness.id, member.id);
+  res.json({ token, business: serializeBusiness(memberBusiness), memberRole: member.role });
 });
 
 authRouter.get('/me', requireAuth, async (req: AuthedRequest, res) => {
   const business = await prisma.business.findUnique({ where: { id: req.businessId! } });
   if (!business) return res.status(404).json({ error: 'Not found' });
-  res.json({ business: serializeBusiness(business) });
+  res.json({ business: serializeBusiness(business), isOwner: !req.memberId });
 });

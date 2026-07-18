@@ -45,7 +45,12 @@ export function MessagesScreen() {
     <View style={styles.container}>
       <SafeAreaView style={styles.header} edges={['top']}>
         <Text style={styles.title}>Messages</Text>
-        <Pressable onPress={() => navigation.navigate('Tabs', { screen: 'Discover' } as never)} hitSlop={8}>
+        <Pressable
+          onPress={() => navigation.navigate('Tabs', { screen: 'Discover' } as never)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Find a business to message"
+        >
           <Icon name="mail" color={colors.backIcon} size={20} />
         </Pressable>
       </SafeAreaView>
@@ -67,6 +72,8 @@ export function MessagesScreen() {
             <Pressable
               style={styles.row}
               onPress={() => navigation.navigate('Thread', { threadId: item.id, otherName: item.business.name })}
+              accessibilityRole="button"
+              accessibilityLabel={`Conversation with ${item.business.name}${item.unread ? ', unread' : ''}`}
             >
               <Avatar uri={item.business.avatarUrl} name={item.business.name} size={48} />
               <View style={styles.rowBody}>

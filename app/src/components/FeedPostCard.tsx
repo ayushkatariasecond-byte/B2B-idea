@@ -40,21 +40,35 @@ export function FeedPostCard({ post, height, isActive, onToggleLike, onShare }: 
       <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.75)']} style={styles.bottomScrim} pointerEvents="none" />
 
       <View style={styles.rail}>
-        <Pressable style={styles.railItem} onPress={() => onToggleLike(post)} hitSlop={10}>
+        <Pressable
+          style={styles.railItem}
+          onPress={() => onToggleLike(post)}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={post.likedByMe ? 'Unlike post' : 'Like post'}
+        >
           <Icon name={post.likedByMe ? 'heartFilled' : 'heart'} color={post.likedByMe ? colors.gold : colors.white} size={30} />
           <Text style={styles.railLabel}>{post.likeCount}</Text>
         </Pressable>
-        <Pressable style={styles.railItem} onPress={() => navigation.navigate('PostDetail', { postId: post.id })} hitSlop={10}>
+        <Pressable
+          style={styles.railItem}
+          onPress={() => navigation.navigate('PostDetail', { postId: post.id })}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="View comments"
+        >
           <Icon name="comment" color={colors.white} size={28} />
           <Text style={styles.railLabel}>{post.commentCount}</Text>
         </Pressable>
-        <Pressable style={styles.railItem} onPress={handleShare} hitSlop={10}>
+        <Pressable style={styles.railItem} onPress={handleShare} hitSlop={10} accessibilityRole="button" accessibilityLabel="Share post">
           <Icon name="send" color={colors.white} size={27} />
           <Text style={styles.railLabel}>{post.shareCount}</Text>
         </Pressable>
         <Pressable
           style={styles.avatarButton}
           onPress={() => navigation.navigate('BusinessProfile', { businessId: post.businessId })}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${post.business.name}'s profile`}
         >
           <Avatar uri={post.business.avatarUrl} name={post.business.name} size={40} />
         </Pressable>

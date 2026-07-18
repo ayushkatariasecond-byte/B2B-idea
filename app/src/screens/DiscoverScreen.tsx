@@ -5,11 +5,13 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Icon } from '../components/Icon';
 import { Chip } from '../components/Chip';
+import { Avatar } from '../components/Avatar';
 import { PostMedia } from '../components/PostMedia';
 import { BottomNav } from '../components/BottomNav';
 import { colors, fonts, radius } from '../theme/tokens';
-import { Post, POST_TAGS } from '../api/types';
+import { Business, Post, POST_TAGS, TrendingTag } from '../api/types';
 import * as postsApi from '../api/posts';
+import * as businessesApi from '../api/businesses';
 import { RootStackParamList } from '../navigation/types';
 
 const FILTERS = ['Trending', ...POST_TAGS];
@@ -20,11 +22,20 @@ export function DiscoverScreen() {
   const [query, setQuery] = useState('');
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [trendingTags, setTrendingTags] = useState<TrendingTag[]>([]);
+  const [businessMatches, setBusinessMatches] = useState<Business[]>([]);
+
+  const isHashtagQuery = query.trim().startsWith('#');
 
   const load = useCallback(async (activeFilter: string, activeQuery: string) => {
     setLoading(true);
     try {
-      const res = await postsApi.discover({ tag: activeFilter === 'Trending' ? undefined : activeFilter, q: activeQuery.trim() || undefined });
+      const trimmed = activeQuery.trim();
+      const res = await postsApi.discover({
+        tag: activeFilter === 'Trending' ? undefined : activeFilter,
+        q: trimmed.startsWith('#') ? undefined : trimmed || undefined,
+        hashtag: trimmed.startsWith('#') ? trimmed.slice(1) : undefined,
+      });
       setPosts(res.posts);
     } finally {
       setLoading(false);
@@ -32,9 +43,25 @@ export function DiscoverScreen() {
   }, []);
 
   useEffect(() => {
+    postsApi.getTrendingTags().then((res) => setTrendingTags(res.tags));
+  }, []);
+
+  useEffect(() => {
     const timeout = setTimeout(() => load(filter, query), 250);
     return () => clearTimeout(timeout);
   }, [filter, query, load]);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      setBusinessMatches([]);
+      return;
+    }
+    const timeout = setTimeout(() => {
+      businessesApi.searchBusinesses(trimmed).then((res) => setBusinessMatches(res.businesses));
+    }, 200);
+    return () => clearTimeout(timeout);
+  }, [query]);
 
   return (
     <View style={styles.container}>
@@ -44,20 +71,56 @@ export function DiscoverScreen() {
           <Icon name="search" size={17} color={colors.inkSoft} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search businesses, tags, topics"
+            placeholder="Search businesses, tags, #topics"
             placeholderTextColor={colors.inkSoft2}
             value={query}
             onChangeText={setQuery}
+            accessibilityLabel="Search businesses, tags, or hashtags"
           />
         </View>
-        <FlatList
-          horizontal
-          data={FILTERS}
-          keyExtractor={(item) => item}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRow}
-          renderItem={({ item }) => <Chip label={item} active={item === filter} onPress={() => setFilter(item)} />}
-        />
+
+        {businessMatches.length > 0 && (
+          <View style={styles.autocompleteBox}>
+            {businessMatches.map((b) => (
+              <Pressable
+                key={b.id}
+                style={styles.autocompleteRow}
+                onPress={() => {
+                  setQuery('');
+                  setBusinessMatches([]);
+                  navigation.navigate('BusinessProfile', { businessId: b.id });
+                }}
+              >
+                <Avatar uri={b.avatarUrl} name={b.name} size={28} />
+                <Text style={styles.autocompleteText}>{b.name}</Text>
+                <Text style={styles.autocompleteHandle}>@{b.handle}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {!query && trendingTags.length > 0 && (
+          <FlatList
+            horizontal
+            data={trendingTags}
+            keyExtractor={(item) => item.tag}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipRow}
+            renderItem={({ item }) => <Chip label={`#${item.tag}`} onPress={() => setQuery(`#${item.tag}`)} />}
+            ListHeaderComponent={<Text style={styles.trendingLabel}>Trending: </Text>}
+          />
+        )}
+
+        {!isHashtagQuery && (
+          <FlatList
+            horizontal
+            data={FILTERS}
+            keyExtractor={(item) => item}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipRow}
+            renderItem={({ item }) => <Chip label={item} active={item === filter} onPress={() => setFilter(item)} />}
+          />
+        )}
       </SafeAreaView>
 
       {loading && posts.length === 0 ? (
@@ -114,7 +177,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   searchInput: { flex: 1, fontSize: 14, color: colors.ink, fontFamily: fonts.body.regular },
-  chipRow: { gap: 8 },
+  autocompleteBox: { backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
+  autocompleteRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10 },
+  autocompleteText: { fontSize: 13, fontFamily: fonts.body.semiBold, color: colors.ink },
+  autocompleteHandle: { fontSize: 12, color: colors.inkSoft2, marginLeft: 'auto' },
+  trendingLabel: { fontSize: 12, color: colors.inkSoft, fontFamily: fonts.body.semiBold, alignSelf: 'center', marginRight: 4 },
+  chipRow: { gap: 8, alignItems: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: colors.inkSoft, fontFamily: fonts.body.medium },
   grid: { paddingHorizontal: 12, paddingTop: 4, paddingBottom: 100, gap: 8 },
