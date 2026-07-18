@@ -20,19 +20,29 @@ export function ProfileScreen() {
   const [business, setBusiness] = useState<Business | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
   const load = useCallback(async () => {
-    if (!me) return;
-    const [businessRes, postsRes, unreadRes] = await Promise.all([
-      businessesApi.getBusiness(me.id),
-      businessesApi.getBusinessPosts(me.id),
-      notificationsApi.getUnreadCount(),
-    ]);
-    setBusiness(businessRes.business);
-    setPosts(postsRes.posts);
-    setUnreadCount(unreadRes.count);
-    setLoading(false);
+    if (!me) {
+      setLoading(false);
+      return;
+    }
+    setError(null);
+    try {
+      const [businessRes, postsRes, unreadRes] = await Promise.all([
+        businessesApi.getBusiness(me.id),
+        businessesApi.getBusinessPosts(me.id),
+        notificationsApi.getUnreadCount(),
+      ]);
+      setBusiness(businessRes.business);
+      setPosts(postsRes.posts);
+      setUnreadCount(unreadRes.count);
+    } catch {
+      setError("Couldn't load your profile. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   }, [me]);
 
   useFocusEffect(
@@ -60,10 +70,21 @@ export function ProfileScreen() {
     ]);
   };
 
-  if (loading || !business) {
+  if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.gold} />
+      </View>
+    );
+  }
+
+  if (!business) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.errorText}>{error ?? "Couldn't load your profile."}</Text>
+        <Pressable onPress={() => { setLoading(true); load(); }} hitSlop={10} accessibilityRole="button">
+          <Text style={styles.retryText}>Try again</Text>
+        </Pressable>
       </View>
     );
   }
@@ -92,7 +113,9 @@ export function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.white },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 },
+  errorText: { color: colors.inkSoft, textAlign: 'center', fontFamily: fonts.body.medium, fontSize: 15 },
+  retryText: { color: colors.gold, textAlign: 'center', fontFamily: fonts.body.bold, fontSize: 14 },
   editButton: {
     backgroundColor: colors.paper2,
     paddingHorizontal: 18,

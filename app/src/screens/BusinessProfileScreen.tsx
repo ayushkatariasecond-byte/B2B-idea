@@ -21,18 +21,25 @@ export function BusinessProfileScreen({ route, navigation }: Props) {
   const [business, setBusiness] = useState<Business | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [messaging, setMessaging] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
   const [blocked, setBlocked] = useState(false);
 
   const load = useCallback(async () => {
-    const [businessRes, postsRes] = await Promise.all([
-      businessesApi.getBusiness(businessId),
-      businessesApi.getBusinessPosts(businessId),
-    ]);
-    setBusiness(businessRes.business);
-    setPosts(postsRes.posts);
-    setLoading(false);
+    setError(null);
+    try {
+      const [businessRes, postsRes] = await Promise.all([
+        businessesApi.getBusiness(businessId),
+        businessesApi.getBusinessPosts(businessId),
+      ]);
+      setBusiness(businessRes.business);
+      setPosts(postsRes.posts);
+    } catch {
+      setError("Couldn't load this profile. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   }, [businessId]);
 
   useEffect(() => {
@@ -80,10 +87,21 @@ export function BusinessProfileScreen({ route, navigation }: Props) {
       ]);
     });
 
-  if (loading || !business) {
+  if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.gold} />
+      </View>
+    );
+  }
+
+  if (!business) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.errorText}>{error ?? "Couldn't load this profile."}</Text>
+        <Pressable onPress={() => { setLoading(true); load(); }} hitSlop={10} accessibilityRole="button">
+          <Text style={styles.retryText}>Try again</Text>
+        </Pressable>
       </View>
     );
   }
@@ -128,7 +146,9 @@ export function BusinessProfileScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.white },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 },
+  errorText: { color: colors.inkSoft, textAlign: 'center', fontFamily: fonts.body.medium, fontSize: 15 },
+  retryText: { color: colors.gold, textAlign: 'center', fontFamily: fonts.body.bold, fontSize: 14 },
   backWrap: { position: 'absolute', top: 0, left: 0 },
   backButton: {
     marginLeft: 16,

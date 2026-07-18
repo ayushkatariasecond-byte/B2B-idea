@@ -6,6 +6,7 @@ import { BottomNav } from '../components/BottomNav';
 import { colors, fonts } from '../theme/tokens';
 import { Post } from '../api/types';
 import * as postsApi from '../api/posts';
+import { ApiError } from '../api/client';
 
 type FeedTab = 'forYou' | 'following';
 
@@ -28,8 +29,12 @@ export function HomeFeedScreen() {
       const res = await postsApi.getFeed(activeTab);
       setPosts(res.posts);
       setActivePostId(res.posts[0]?.id ?? null);
-    } catch {
-      setError('Login required for the Following feed.');
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401 && activeTab === 'following') {
+        setError('Log in to see posts from businesses you follow.');
+      } else {
+        setError("Couldn't load your feed. Check your connection and try again.");
+      }
       setPosts([]);
     } finally {
       setLoading(false);
@@ -81,6 +86,11 @@ export function HomeFeedScreen() {
       ) : posts.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.emptyText}>{error ?? "Nothing here yet — follow a few businesses to fill this feed."}</Text>
+          {error && (
+            <Pressable onPress={() => load(tab)} hitSlop={10} accessibilityRole="button">
+              <Text style={styles.retryText}>Try again</Text>
+            </Pressable>
+          )}
         </View>
       ) : height === 0 ? null : (
         <FlatList
@@ -124,6 +134,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.dark },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyText: { color: colors.white, textAlign: 'center', fontFamily: fonts.body.medium, fontSize: 15 },
+  retryText: { color: colors.gold, textAlign: 'center', fontFamily: fonts.body.bold, fontSize: 14, marginTop: 14 },
   tabsWrap: { position: 'absolute', top: 0, left: 0, right: 0 },
   tabsRow: { flexDirection: 'row', justifyContent: 'center', gap: 26, paddingTop: 12 },
   tabLabel: { fontFamily: fonts.display.semiBold, fontSize: 16, paddingBottom: 6 },
