@@ -11,6 +11,7 @@ import { notificationsRouter } from './routes/notifications';
 import { reportsRouter } from './routes/reports';
 import { UPLOAD_DIR } from './upload';
 import { prisma } from './db';
+import { setupRealtime } from './realtime';
 
 export const app = express();
 
@@ -46,9 +47,10 @@ async function publishDueScheduledPosts() {
 }
 
 if (require.main === module) {
-  app.listen(env.port, () => {
+  const server = app.listen(env.port, () => {
     console.log(`Verve API listening on http://localhost:${env.port}`);
   });
+  setupRealtime(server);
   publishDueScheduledPosts();
   setInterval(publishDueScheduledPosts, 60_000);
 }

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -12,6 +12,7 @@ import * as businessesApi from '../api/businesses';
 import * as notificationsApi from '../api/notifications';
 import { RootStackParamList } from '../navigation/types';
 import { alert } from '../utils/alert';
+import { onRealtimeEvent } from '../utils/realtimeEvents';
 
 export function ProfileScreen() {
   const { business: me } = useAuth();
@@ -39,6 +40,14 @@ export function ProfileScreen() {
       load();
     }, [load])
   );
+
+  useEffect(() => {
+    return onRealtimeEvent((event) => {
+      if (event.kind === 'notification') {
+        notificationsApi.getUnreadCount().then((res) => setUnreadCount(res.count));
+      }
+    });
+  }, []);
 
   const showMoreMenu = () => {
     alert('More', undefined, [

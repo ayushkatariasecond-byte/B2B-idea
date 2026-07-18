@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -10,6 +10,7 @@ import { colors, fonts } from '../theme/tokens';
 import { ThreadSummary } from '../api/types';
 import * as threadsApi from '../api/threads';
 import { RootStackParamList } from '../navigation/types';
+import { onRealtimeEvent } from '../utils/realtimeEvents';
 
 function formatTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -40,6 +41,14 @@ export function MessagesScreen() {
       };
     }, [])
   );
+
+  useEffect(() => {
+    return onRealtimeEvent((event) => {
+      if (event.kind === 'thread-message') {
+        threadsApi.getThreads().then((res) => setThreads(res.threads));
+      }
+    });
+  }, []);
 
   return (
     <View style={styles.container}>

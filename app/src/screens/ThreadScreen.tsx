@@ -8,6 +8,7 @@ import { colors, fonts } from '../theme/tokens';
 import { RootStackParamList } from '../navigation/types';
 import { ThreadMessage } from '../api/types';
 import * as threadsApi from '../api/threads';
+import { onRealtimeEvent } from '../utils/realtimeEvents';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Thread'>;
 
@@ -32,6 +33,14 @@ export function ThreadScreen({ route, navigation }: Props) {
       return () => clearInterval(interval);
     }, [load])
   );
+
+  useEffect(() => {
+    return onRealtimeEvent((event) => {
+      if (event.kind !== 'thread-message' || event.threadId !== threadId) return;
+      setMessages((prev) => (prev.some((m) => m.id === event.message.id) ? prev : [...prev, event.message]));
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+    });
+  }, [threadId]);
 
   const send = async () => {
     if (!text.trim() || sending) return;

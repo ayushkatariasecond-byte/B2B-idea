@@ -4,6 +4,7 @@ import { createNativeStackNavigator, NativeStackNavigationProp } from '@react-na
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { colors } from '../theme/tokens';
 import { RootStackParamList } from './types';
 import { TabNavigator } from './TabNavigator';
@@ -60,6 +61,7 @@ export function RootNavigator() {
   const { business, isLoading } = useAuth();
   const [showSplash, setShowSplash] = useState(() => !hasShownSplash);
   usePushNotifications(Boolean(business));
+  useRealtimeConnection(Boolean(business));
 
   if (showSplash) {
     return (

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -9,6 +9,7 @@ import { colors, fonts } from '../theme/tokens';
 import { RootStackParamList } from '../navigation/types';
 import { AppNotification } from '../api/types';
 import * as notificationsApi from '../api/notifications';
+import { onRealtimeEvent } from '../utils/realtimeEvents';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Notifications'>;
 
@@ -54,6 +55,14 @@ export function NotificationsScreen({ navigation }: Props) {
       };
     }, [])
   );
+
+  useEffect(() => {
+    return onRealtimeEvent((event) => {
+      if (event.kind !== 'notification') return;
+      notificationsApi.getNotifications().then((res) => setNotifications(res.notifications));
+      notificationsApi.markAllRead().catch(() => undefined);
+    });
+  }, []);
 
   const openNotification = (n: AppNotification) => {
     if (n.type === 'message' && n.threadId) {

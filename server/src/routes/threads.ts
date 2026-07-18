@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../db';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { notify } from '../utils/notifications';
+import { sendToBusiness } from '../realtime';
 
 export const threadsRouter = Router();
 
@@ -109,5 +110,10 @@ threadsRouter.post('/:id/messages', requireAuth, async (req: AuthedRequest, res)
   const message = await prisma.message.create({ data: { threadId: thread.id, senderId: meId, text: parsed.data.text } });
   const recipientId = thread.participantAId === meId ? thread.participantBId : thread.participantAId;
   void notify({ recipientId, actorId: meId, type: 'message', threadId: thread.id });
+  sendToBusiness(recipientId, {
+    kind: 'thread-message',
+    threadId: thread.id,
+    message: { id: message.id, text: message.text, senderId: message.senderId, createdAt: message.createdAt, mine: false },
+  });
   res.status(201).json({ message: { id: message.id, text: message.text, senderId: message.senderId, createdAt: message.createdAt, mine: true } });
 });

@@ -1,5 +1,6 @@
 import { prisma } from '../db';
 import { sendExpoPush } from './push';
+import { sendToBusiness } from '../realtime';
 
 type NotificationType = 'like' | 'comment' | 'follow' | 'message';
 
@@ -22,7 +23,7 @@ interface NotifyInput {
 export async function notify({ recipientId, actorId, type, postId, threadId }: NotifyInput): Promise<void> {
   if (recipientId === actorId) return;
   try {
-    await prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: { recipientId, actorId, type, postId, threadId },
     });
 
@@ -33,6 +34,7 @@ export async function notify({ recipientId, actorId, type, postId, threadId }: N
     if (recipient?.expoPushToken && actor) {
       void sendExpoPush(recipient.expoPushToken, 'Verve', MESSAGES[type](actor.name), { type, postId, threadId });
     }
+    sendToBusiness(recipientId, { kind: 'notification', notificationId: notification.id, type, postId, threadId });
   } catch {
     // notifications are best-effort; never let this break the caller
   }
