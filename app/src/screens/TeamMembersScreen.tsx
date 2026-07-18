@@ -23,10 +23,16 @@ export function TeamMembersScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [inviting, setInviting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const res = await teamApi.getTeamMembers();
-    setMembers(res.members);
+    try {
+      const res = await teamApi.getTeamMembers();
+      setMembers(res.members);
+      setLoadError(null);
+    } catch {
+      setLoadError("Couldn't load your team. Check your connection and try again.");
+    }
   }, []);
 
   useFocusEffect(
@@ -108,7 +114,16 @@ export function TeamMembersScreen({ navigation }: Props) {
             )}
           </View>
         )}
-        ListEmptyComponent={<Text style={styles.emptyText}>No teammates yet.</Text>}
+        ListEmptyComponent={
+          <View>
+            <Text style={styles.emptyText}>{loadError ?? 'No teammates yet.'}</Text>
+            {loadError && (
+              <Pressable onPress={load} hitSlop={10} accessibilityRole="button">
+                <Text style={styles.retryText}>Try again</Text>
+              </Pressable>
+            )}
+          </View>
+        }
       />
     </SafeAreaView>
   );
@@ -135,4 +150,5 @@ const styles = StyleSheet.create({
   rowRole: { fontSize: 12, color: colors.inkSoft2, marginTop: 2, textTransform: 'capitalize' },
   removeText: { color: '#b3261e', fontFamily: fonts.body.bold, fontSize: 13 },
   emptyText: { color: colors.inkSoft2, textAlign: 'center', fontFamily: fonts.body.medium, marginTop: 20 },
+  retryText: { color: colors.gold, textAlign: 'center', fontFamily: fonts.body.bold, fontSize: 14, marginTop: 10 },
 });

@@ -22,11 +22,18 @@ function formatScheduled(iso: string | null): string | null {
 export function DraftsScreen({ navigation }: Props) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const res = await postsApi.getDrafts();
-    setPosts(res.posts);
-    setLoading(false);
+    setError(null);
+    try {
+      const res = await postsApi.getDrafts();
+      setPosts(res.posts);
+    } catch {
+      setError("Couldn't load your drafts. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useFocusEffect(
@@ -70,7 +77,12 @@ export function DraftsScreen({ navigation }: Props) {
         </View>
       ) : posts.length === 0 ? (
         <View style={styles.center}>
-          <Text style={styles.emptyText}>No drafts or scheduled posts yet.</Text>
+          <Text style={styles.emptyText}>{error ?? 'No drafts or scheduled posts yet.'}</Text>
+          {error && (
+            <Pressable onPress={() => { setLoading(true); load(); }} hitSlop={10} accessibilityRole="button">
+              <Text style={styles.retryText}>Try again</Text>
+            </Pressable>
+          )}
         </View>
       ) : (
         <FlatList
@@ -109,8 +121,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.white },
   header: { paddingHorizontal: 18, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontFamily: fonts.display.bold, fontSize: 18, color: colors.ink },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 },
   emptyText: { color: colors.inkSoft, textAlign: 'center', fontFamily: fonts.body.medium },
+  retryText: { color: colors.gold, textAlign: 'center', fontFamily: fonts.body.bold, fontSize: 14 },
   list: { padding: 16, gap: 14 },
   card: { flexDirection: 'row', gap: 12, backgroundColor: colors.paper2, borderRadius: radius.md, padding: 10 },
   thumb: { width: 64, height: 90, borderRadius: 10, overflow: 'hidden' },

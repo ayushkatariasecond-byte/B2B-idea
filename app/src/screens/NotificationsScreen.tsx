@@ -40,21 +40,30 @@ function formatTime(iso: string): string {
 export function NotificationsScreen({ navigation }: Props) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      notificationsApi.getNotifications().then((res) => {
+  const load = useCallback(() => {
+    let active = true;
+    notificationsApi
+      .getNotifications()
+      .then((res) => {
         if (!active) return;
         setNotifications(res.notifications);
-        setLoading(false);
+        setError(null);
+      })
+      .catch(() => {
+        if (active) setError("Couldn't load notifications. Check your connection and try again.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
-      notificationsApi.markAllRead().catch(() => undefined);
-      return () => {
-        active = false;
-      };
-    }, [])
-  );
+    notificationsApi.markAllRead().catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useFocusEffect(load);
 
   useEffect(() => {
     return onRealtimeEvent((event) => {
@@ -90,7 +99,14 @@ export function NotificationsScreen({ navigation }: Props) {
         </View>
       ) : notifications.length === 0 ? (
         <View style={styles.center}>
-          <Text style={styles.emptyText}>Nothing yet — likes, comments, follows, and messages will show up here.</Text>
+          <Text style={styles.emptyText}>
+            {error ?? 'Nothing yet — likes, comments, follows, and messages will show up here.'}
+          </Text>
+          {error && (
+            <Pressable onPress={() => { setLoading(true); load(); }} hitSlop={10} accessibilityRole="button">
+              <Text style={styles.retryText}>Try again</Text>
+            </Pressable>
+          )}
         </View>
       ) : (
         <FlatList
@@ -120,8 +136,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.white },
   header: { paddingHorizontal: 18, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontFamily: fonts.display.bold, fontSize: 18, color: colors.ink },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 },
   emptyText: { color: colors.inkSoft, textAlign: 'center', fontFamily: fonts.body.medium },
+  retryText: { color: colors.gold, textAlign: 'center', fontFamily: fonts.body.bold, fontSize: 14 },
   list: { paddingHorizontal: 12, paddingBottom: 40 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 8 },
   iconBadge: {

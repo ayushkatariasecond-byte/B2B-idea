@@ -22,8 +22,12 @@ export function ThreadScreen({ route, navigation }: Props) {
   const listRef = useRef<FlatList<ThreadMessage>>(null);
 
   const load = useCallback(async () => {
-    const res = await threadsApi.getMessages(threadId);
-    setMessages(res.messages);
+    try {
+      const res = await threadsApi.getMessages(threadId);
+      setMessages(res.messages);
+    } catch {
+      // Silent — the 4s poll will retry, and the screen has no loading gate to get stuck on.
+    }
   }, [threadId]);
 
   useFocusEffect(

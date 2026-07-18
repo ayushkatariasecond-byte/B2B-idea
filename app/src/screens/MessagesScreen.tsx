@@ -26,21 +26,30 @@ export function MessagesScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      threadsApi.getThreads().then((res) => {
+  const load = useCallback(() => {
+    let active = true;
+    threadsApi
+      .getThreads()
+      .then((res) => {
         if (active) {
           setThreads(res.threads);
-          setLoading(false);
+          setError(null);
         }
+      })
+      .catch(() => {
+        if (active) setError("Couldn't load your messages. Check your connection and try again.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
-      return () => {
-        active = false;
-      };
-    }, [])
-  );
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useFocusEffect(load);
 
   useEffect(() => {
     return onRealtimeEvent((event) => {
@@ -70,7 +79,12 @@ export function MessagesScreen() {
         </View>
       ) : threads.length === 0 ? (
         <View style={styles.center}>
-          <Text style={styles.emptyText}>No conversations yet. Message a business from their profile.</Text>
+          <Text style={styles.emptyText}>{error ?? 'No conversations yet. Message a business from their profile.'}</Text>
+          {error && (
+            <Pressable onPress={() => { setLoading(true); load(); }} hitSlop={10} accessibilityRole="button">
+              <Text style={styles.retryText}>Try again</Text>
+            </Pressable>
+          )}
         </View>
       ) : (
         <FlatList
@@ -111,8 +125,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.white },
   header: { paddingHorizontal: 20, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontFamily: fonts.display.bold, fontSize: 26, color: colors.ink },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 },
   emptyText: { color: colors.inkSoft, textAlign: 'center', fontFamily: fonts.body.medium },
+  retryText: { color: colors.gold, textAlign: 'center', fontFamily: fonts.body.bold, fontSize: 14 },
   list: { paddingHorizontal: 12, paddingBottom: 100 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 8, borderRadius: 12 },
   rowBody: { flex: 1, minWidth: 0 },

@@ -17,13 +17,19 @@ export function SuggestedFollowsScreen({ navigation }: Props) {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    businessesApi.getSuggested().then((res) => {
-      setBusinesses(res.businesses);
-      setLoading(false);
-    });
-  }, []);
+  const load = () => {
+    setLoading(true);
+    setError(null);
+    businessesApi
+      .getSuggested()
+      .then((res) => setBusinesses(res.businesses))
+      .catch(() => setError("Couldn't load suggestions. Check your connection and try again."))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, []);
 
   const toggle = async (business: Business) => {
     const isFollowed = followedIds.has(business.id);
@@ -51,6 +57,13 @@ export function SuggestedFollowsScreen({ navigation }: Props) {
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={colors.gold} />
+        </View>
+      ) : error ? (
+        <View style={styles.center}>
+          <Text style={styles.subtitle}>{error}</Text>
+          <Pressable onPress={load} hitSlop={10} accessibilityRole="button">
+            <Text style={styles.retryText}>Try again</Text>
+          </Pressable>
         </View>
       ) : (
         <FlatList
@@ -94,7 +107,8 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 24, paddingTop: 12, gap: 8 },
   title: { fontFamily: fonts.display.bold, fontSize: 24, color: colors.ink },
   subtitle: { fontSize: 14, color: colors.inkSoft, lineHeight: 20, fontFamily: fonts.body.regular },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 },
+  retryText: { color: colors.gold, textAlign: 'center', fontFamily: fonts.body.bold, fontSize: 14 },
   list: { padding: 20, gap: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   name: { fontSize: 14, fontFamily: fonts.body.bold, color: colors.ink },

@@ -21,15 +21,36 @@ function deltaLabel(value: number, suffix: string): string {
 
 export function AnalyticsScreen({ navigation }: Props) {
   const [data, setData] = useState<AnalyticsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    analyticsApi.getMyAnalytics().then(setData);
-  }, []);
+  const load = () => {
+    setLoading(true);
+    setError(null);
+    analyticsApi
+      .getMyAnalytics()
+      .then(setData)
+      .catch(() => setError("Couldn't load analytics. Check your connection and try again."))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, []);
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator color={colors.gold} />
+      </View>
+    );
+  }
 
   if (!data) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.gold} />
+        <Text style={styles.errorText}>{error ?? "Couldn't load analytics."}</Text>
+        <Pressable onPress={load} hitSlop={10} accessibilityRole="button">
+          <Text style={styles.retryText}>Try again</Text>
+        </Pressable>
       </View>
     );
   }
@@ -119,7 +140,9 @@ export function AnalyticsScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 },
+  errorText: { color: colors.inkSoft, textAlign: 'center', fontFamily: fonts.body.medium, fontSize: 15 },
+  retryText: { color: colors.gold, textAlign: 'center', fontFamily: fonts.body.bold, fontSize: 14 },
   header: { paddingHorizontal: 20, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
   backButton: {
     width: 34,

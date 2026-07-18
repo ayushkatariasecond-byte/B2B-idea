@@ -33,17 +33,24 @@ export function PostDetailScreen({ route, navigation }: Props) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentText, setCommentText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [postRes, commentsRes] = await Promise.all([postsApi.getPost(postId), postsApi.getComments(postId)]);
-    setPost(postRes.post);
-    setSaved(postRes.post.savedByMe);
-    setComments(commentsRes.comments);
-    setLoading(false);
-    postsApi.recordView(postId).catch(() => undefined);
+    setError(null);
+    try {
+      const [postRes, commentsRes] = await Promise.all([postsApi.getPost(postId), postsApi.getComments(postId)]);
+      setPost(postRes.post);
+      setSaved(postRes.post.savedByMe);
+      setComments(commentsRes.comments);
+      postsApi.recordView(postId).catch(() => undefined);
+    } catch {
+      setError("Couldn't load this post. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   }, [postId]);
 
   useEffect(() => {
@@ -93,10 +100,21 @@ export function PostDetailScreen({ route, navigation }: Props) {
       setPost({ ...post, commentCount: Math.max(0, post.commentCount - 1) });
     });
 
-  if (loading || !post) {
+  if (loading) {
     return (
       <View style={styles.loadingWrap}>
         <ActivityIndicator color={colors.gold} />
+      </View>
+    );
+  }
+
+  if (!post) {
+    return (
+      <View style={styles.loadingWrap}>
+        <Text style={styles.errorText}>{error ?? "Couldn't load this post."}</Text>
+        <Pressable onPress={load} hitSlop={10} accessibilityRole="button">
+          <Text style={styles.retryText}>Try again</Text>
+        </Pressable>
       </View>
     );
   }
@@ -197,7 +215,9 @@ export function PostDetailScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.dark },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.dark, padding: 32, gap: 14 },
+  errorText: { color: colors.white, textAlign: 'center', fontFamily: fonts.body.medium, fontSize: 15 },
+  retryText: { color: colors.gold, textAlign: 'center', fontFamily: fonts.body.bold, fontSize: 14 },
   container: { flex: 1, backgroundColor: colors.dark },
   mediaWrap: { height: '56%', flexShrink: 0 },
   mediaScrim: { backgroundColor: 'rgba(0,0,0,0.35)' },
