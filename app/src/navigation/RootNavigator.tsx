@@ -71,8 +71,8 @@ export function RootNavigator() {
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Tabs">
-      <Stack.Screen name="SuggestedFollows" component={SuggestedFollowsScreen} />
       <Stack.Screen name="Tabs" component={TabsGate} />
+      <Stack.Screen name="SuggestedFollows" component={SuggestedFollowsScreen} />
       <Stack.Screen name="Compose" component={ComposeScreen} options={{ presentation: 'modal' }} />
       <Stack.Screen name="PostDetail" component={PostDetailScreen} />
       <Stack.Screen name="BusinessProfile" component={BusinessProfileScreen} />
