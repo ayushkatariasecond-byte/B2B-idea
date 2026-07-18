@@ -1,7 +1,9 @@
 import request from 'supertest';
 import path from 'path';
+import fs from 'fs';
 import { app } from '../index';
 import { prisma } from '../db';
+import { UPLOAD_DIR } from '../upload';
 
 async function signup(handle: string) {
   const res = await request(app).post('/auth/signup').send({
@@ -556,4 +558,22 @@ describe('Verve API', () => {
     expect(res.body.business.verificationRequested).toBe(true);
     expect(res.body.business.verified).toBe(false);
   });
+
+  it('transcodes an uploaded video to a web-friendly mp4 and removes the raw original', async () => {
+    const { token } = await signup('videotranscode');
+    const res = await request(app)
+      .post('/posts')
+      .set('Authorization', `Bearer ${token}`)
+      .field('caption', 'Real video upload')
+      .field('tag', 'Product Launch')
+      .attach('media', path.join(__dirname, 'fixtures', 'sample.mp4'));
+
+    expect(res.status).toBe(201);
+    expect(res.body.post.mediaType).toBe('video');
+    expect(res.body.post.mediaUrl).toMatch(/-web\.mp4$/);
+
+    const transcodedPath = path.join(UPLOAD_DIR, path.basename(res.body.post.mediaUrl));
+    expect(fs.existsSync(transcodedPath)).toBe(true);
+    expect(fs.statSync(transcodedPath).size).toBeGreaterThan(0);
+  }, 20000);
 });

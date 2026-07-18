@@ -7,6 +7,7 @@ import { upload, mediaTypeFromMime } from '../upload';
 import { extractHashtags } from '../utils/hashtags';
 import { getExcludedBusinessIds } from '../utils/blocking';
 import { notify } from '../utils/notifications';
+import { transcodeVideo } from '../utils/videoTranscode';
 
 export const postsRouter = Router();
 
@@ -180,11 +181,21 @@ postsRouter.post('/', requireAuth, postUpload, async (req: AuthedRequest, res) =
   const thumbnailFile = files?.thumbnail?.[0];
   if (!mediaFile) return res.status(400).json({ error: 'A photo or video is required' });
 
+  const mediaType = mediaTypeFromMime(mediaFile.mimetype);
+  let mediaFilename = mediaFile.filename;
+  if (mediaType === 'video') {
+    try {
+      mediaFilename = await transcodeVideo(mediaFile.filename);
+    } catch {
+      // Transcoding is a nice-to-have — fall back to the original upload rather than blocking the post.
+    }
+  }
+
   const post = await prisma.post.create({
     data: {
       businessId: req.businessId!,
-      mediaUrl: `/uploads/${mediaFile.filename}`,
-      mediaType: mediaTypeFromMime(mediaFile.mimetype),
+      mediaUrl: `/uploads/${mediaFilename}`,
+      mediaType,
       thumbnailUrl: thumbnailFile ? `/uploads/${thumbnailFile.filename}` : null,
       caption: parsed.data.caption,
       tag: parsed.data.tag,
