@@ -19,7 +19,8 @@ export type IconName =
   | 'mail'
   | 'volumeOn'
   | 'volumeOff'
-  | 'play';
+  | 'play'
+  | 'arrowRight';
 
 interface IconProps {
   name: IconName;
@@ -154,6 +155,12 @@ export function Icon({ name, size = 22, color = '#000000', strokeWidth = 1.8 }: 
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24">
           <Path d="M6 4v16l14-8L6 4Z" fill={color} />
+        </Svg>
+      );
+    case 'arrowRight':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path d="M5 12h14M13 6l6 6-6 6" stroke={color} strokeWidth={2.4} fill="none" strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
     default:

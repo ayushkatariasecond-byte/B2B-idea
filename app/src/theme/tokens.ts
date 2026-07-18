@@ -37,6 +37,12 @@ export const colors = {
 
   dark: '#090704', // oklch(0.13 0.01 90) — video/full-bleed surfaces
   darkGold: '#1a150b', // oklch(0.2 0.02 85) — creativity score card
+  darkGoldDeep: '#030201', // oklch(0.09 0.01 90) — splash radial gradient outer edge
+  splashGlow1: '#ddb13a', // oklch(0.78 0.14 88) — splash glow orb / verve. dot
+  splashGlow2: '#cc9300', // oklch(0.7 0.15 82) — splash glow orb 2
+  splashSubtext: '#b3aea0', // oklch(0.75 0.02 90) — splash subhead text
+  gradientGoldStart: '#e3b842', // oklch(0.8 0.14 88) — CTA gradient start
+  gradientGoldEnd: '#c58300', // oklch(0.66 0.16 79) — CTA gradient end
 
   green: '#278733', // oklch(0.55 0.15 145) — positive delta
 } as const;

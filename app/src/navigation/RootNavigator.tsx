@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { createNativeStackNavigator, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
@@ -7,6 +7,7 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 import { colors } from '../theme/tokens';
 import { RootStackParamList } from './types';
 import { TabNavigator } from './TabNavigator';
+import { SplashScreen } from '../screens/SplashScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { SignupScreen } from '../screens/SignupScreen';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -45,9 +46,31 @@ function TabsGate() {
   return <TabNavigator />;
 }
 
+/**
+ * Splash is meant to greet a real app open once, not to be an addressable route — it has
+ * no useful state to deep-link into and (per the TabsGate lesson above) fighting React
+ * Navigation's web `linking` sync to make an unmapped screen "sticky" doesn't work: the
+ * URL/state sync kept snapping straight back to Onboarding. Rendering it as a plain gate
+ * above the navigator sidesteps routing entirely. The module-level flag (reset only by an
+ * actual page/app reload) keeps it to once per session.
+ */
+let hasShownSplash = false;
+
 export function RootNavigator() {
   const { business, isLoading } = useAuth();
+  const [showSplash, setShowSplash] = useState(() => !hasShownSplash);
   usePushNotifications(Boolean(business));
+
+  if (showSplash) {
+    return (
+      <SplashScreen
+        onDone={() => {
+          hasShownSplash = true;
+          setShowSplash(false);
+        }}
+      />
+    );
+  }
 
   if (isLoading) {
     return (
