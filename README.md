@@ -28,6 +28,8 @@ npm run web         # http://localhost:8081
 
 Sign up fresh, or log in as one of the seeded demo businesses (`novarobotics@verve.demo` / `password123`, etc. — see `server/README.md`).
 
+**After every `git pull`**: if the server code changed, just run `npm run dev` again inside `server/` — it now automatically applies any new database migrations before starting (via a `predev` script running `prisma migrate deploy`), so your local database never falls out of sync with the code.
+
 For a real device/simulator, set `EXPO_PUBLIC_API_URL` in `app/.env` to your machine's LAN IP instead of `localhost`.
 
 ## Notable product decisions made while building this
