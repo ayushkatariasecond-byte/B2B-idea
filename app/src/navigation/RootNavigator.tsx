@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createNativeStackNavigator, NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { colors } from '../theme/tokens';
@@ -24,8 +25,28 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+/**
+ * React Navigation only reads `initialRouteName` the first time this Stack.Navigator ever
+ * mounts — it's not re-evaluated on later renders, so a stale `justSignedUp` computed once
+ * at signup would keep sending every later login back to SuggestedFollows. Doing the
+ * redirect here instead (a real screen inside the navigator, so `useNavigation` works and
+ * runs on every mount) makes it react correctly each time `justSignedUp` changes.
+ */
+function TabsGate() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { justSignedUp } = useAuth();
+
+  useEffect(() => {
+    if (justSignedUp) {
+      navigation.replace('SuggestedFollows');
+    }
+  }, [justSignedUp, navigation]);
+
+  return <TabNavigator />;
+}
+
 export function RootNavigator() {
-  const { business, isLoading, justSignedUp } = useAuth();
+  const { business, isLoading } = useAuth();
   usePushNotifications(Boolean(business));
 
   if (isLoading) {
@@ -49,9 +70,9 @@ export function RootNavigator() {
   }
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={justSignedUp ? 'SuggestedFollows' : 'Tabs'}>
+    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Tabs">
       <Stack.Screen name="SuggestedFollows" component={SuggestedFollowsScreen} />
-      <Stack.Screen name="Tabs" component={TabNavigator} />
+      <Stack.Screen name="Tabs" component={TabsGate} />
       <Stack.Screen name="Compose" component={ComposeScreen} options={{ presentation: 'modal' }} />
       <Stack.Screen name="PostDetail" component={PostDetailScreen} />
       <Stack.Screen name="BusinessProfile" component={BusinessProfileScreen} />
