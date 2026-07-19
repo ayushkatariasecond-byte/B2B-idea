@@ -84,10 +84,31 @@ export function ReopenIntro({ onDone }: Props) {
   const lastStageRef = useRef(0);
   const lastStatusRef = useRef(true);
   const finishingRef = useRef(false);
+  const lastYRef = useRef(0);
 
   useEffect(() => {
     if (!ready) return;
+    let stopTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // "One committed flick completes the intro." We detect the scroll settling (no scroll
+    // event for a beat) and, if the user has scrolled past the commit point, glide the rest
+    // of the way into the feed. This works on web (wheel/trackpad, where momentum-end
+    // callbacks don't fire) and native alike, since both stop emitting scroll events at rest.
+    // We only ever complete forward — never yank the user backward — so a small scroll just
+    // rests on a valid frame they can keep scrubbing.
+    const COMMIT = 0.4;
+    const completeForward = () => {
+      if (finishingRef.current) return;
+      const p = lastYRef.current / L;
+      if (p >= COMMIT && p < 0.99) {
+        const node: any = scrollRef.current;
+        if (node?.scrollTo) node.scrollTo({ y: L, animated: true });
+        else node?.getScrollableNode?.()?.scrollTo?.({ top: L, behavior: 'smooth' });
+      }
+    };
+
     const id = scrollY.addListener(({ value }) => {
+      lastYRef.current = value;
       const p = Math.min(1, Math.max(0, value / L));
 
       const s = copyStageFor(p);
@@ -108,27 +129,15 @@ export function ReopenIntro({ onDone }: Props) {
         // feed mounted beneath it (spec §1: "once p has reached 1 you can unmount").
         Animated.timing(exitOpacity, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => onDone());
       }
-    });
-    return () => scrollY.removeListener(id);
-  }, [ready, L, scrollY, exitOpacity, onDone]);
 
-  // "One committed flick + momentum completes the intro." After the finger lifts (drag or
-  // momentum end), a scroll past the commit point auto-completes into the feed; a small one
-  // springs back to the start. This acts only AFTER release — it never hijacks the gesture
-  // itself, so scrolling stays fully scrubbable in both directions while the finger is down.
-  const COMMIT = 0.3;
-  const settle = useCallback(
-    (offsetY: number) => {
-      if (finishingRef.current || !ready) return;
-      const p = offsetY / L;
-      if (p >= COMMIT && p < 0.99) {
-        scrollRef.current?.scrollTo?.({ y: L, animated: true });
-      } else if (p > 0.002 && p < COMMIT) {
-        scrollRef.current?.scrollTo?.({ y: 0, animated: true });
-      }
-    },
-    [ready, L]
-  );
+      if (stopTimer) clearTimeout(stopTimer);
+      stopTimer = setTimeout(completeForward, 160);
+    });
+    return () => {
+      scrollY.removeListener(id);
+      if (stopTimer) clearTimeout(stopTimer);
+    };
+  }, [ready, L, scrollY, exitOpacity, onDone]);
 
   const onScroll = useMemo(
     () => Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false }),
@@ -266,8 +275,6 @@ export function ReopenIntro({ onDone }: Props) {
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={onScroll}
-        onScrollEndDrag={(e) => settle(e.nativeEvent.contentOffset.y)}
-        onMomentumScrollEnd={(e) => settle(e.nativeEvent.contentOffset.y)}
         decelerationRate="normal"
       />
 
