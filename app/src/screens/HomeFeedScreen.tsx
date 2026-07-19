@@ -30,7 +30,9 @@ export function HomeFeedScreen() {
       setPosts(res.posts);
       setActivePostId(res.posts[0]?.id ?? null);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401 && activeTab === 'following') {
+      if (e instanceof ApiError && e.status === 0) {
+        setError(e.message);
+      } else if (e instanceof ApiError && e.status === 401 && activeTab === 'following') {
         setError('Log in to see posts from businesses you follow.');
       } else {
         setError("Couldn't load your feed. Check your connection and try again.");
