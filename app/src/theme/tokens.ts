@@ -35,6 +35,9 @@ export const colors = {
   avatarPlaceholder2: '#eee4cf', // oklch(0.92 0.03 85)
   barNeutral: '#dfdeda', // oklch(0.9 0.006 95)
 
+  reopenPlum: '#3a0f1f', // reopen animation — beat 3 background
+  reopenPaper: '#f2efe7', // reopen animation — beat 4 handoff background / nav bar
+
   dark: '#090704', // oklch(0.13 0.01 90) — video/full-bleed surfaces
   darkGold: '#1a150b', // oklch(0.2 0.02 85) — creativity score card
   darkGoldDeep: '#030201', // oklch(0.09 0.01 90) — splash radial gradient outer edge

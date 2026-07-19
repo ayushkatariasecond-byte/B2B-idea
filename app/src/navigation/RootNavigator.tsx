@@ -8,7 +8,7 @@ import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { colors } from '../theme/tokens';
 import { RootStackParamList } from './types';
 import { TabNavigator } from './TabNavigator';
-import { SplashScreen } from '../screens/SplashScreen';
+import { ReopenIntro } from '../screens/ReopenIntro';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { SignupScreen } from '../screens/SignupScreen';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -48,42 +48,30 @@ function TabsGate() {
 }
 
 /**
- * Splash is meant to greet a real app open once, not to be an addressable route — it has
- * no useful state to deep-link into and (per the TabsGate lesson above) fighting React
- * Navigation's web `linking` sync to make an unmapped screen "sticky" doesn't work: the
- * URL/state sync kept snapping straight back to Onboarding. Rendering it as a plain gate
- * above the navigator sidesteps routing entirely. The module-level flag (reset only by an
- * actual page/app reload) keeps it to once per session.
+ * The reopen intro greets a real app open once, then hands off into the live feed. It is
+ * NOT an addressable route (per the TabsGate lesson above, fighting React Navigation's web
+ * `linking` sync to make an unmapped screen "sticky" doesn't work). Instead the real app is
+ * mounted underneath and the intro is a plain absolute overlay on top that dissolves to
+ * reveal it — so the handoff is seamless with no navigation and no unmount mid-gesture. The
+ * module-level flag (reset only by an actual page/app reload) keeps it to once per session.
  */
-let hasShownSplash = false;
+let hasShownReopen = false;
 
 export function RootNavigator() {
   const { business, isLoading } = useAuth();
-  const [showSplash, setShowSplash] = useState(() => !hasShownSplash);
+  const [showReopen, setShowReopen] = useState(() => !hasShownReopen);
   usePushNotifications(Boolean(business));
   useRealtimeConnection(Boolean(business));
 
-  if (showSplash) {
-    return (
-      <SplashScreen
-        onDone={() => {
-          hasShownSplash = true;
-          setShowSplash(false);
-        }}
-      />
-    );
-  }
-
+  let content: React.ReactNode;
   if (isLoading) {
-    return (
+    content = (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white }}>
         <ActivityIndicator color={colors.gold} />
       </View>
     );
-  }
-
-  if (!business) {
-    return (
+  } else if (!business) {
+    content = (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         <Stack.Screen name="Signup" component={SignupScreen} />
@@ -92,23 +80,37 @@ export function RootNavigator() {
         <Stack.Screen name="BusinessProfile" component={BusinessProfileScreen} />
       </Stack.Navigator>
     );
+  } else {
+    content = (
+      <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Tabs">
+        <Stack.Screen name="Tabs" component={TabsGate} />
+        <Stack.Screen name="SuggestedFollows" component={SuggestedFollowsScreen} />
+        <Stack.Screen name="Compose" component={ComposeScreen} options={{ presentation: 'modal' }} />
+        <Stack.Screen name="PostDetail" component={PostDetailScreen} />
+        <Stack.Screen name="BusinessProfile" component={BusinessProfileScreen} />
+        <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ presentation: 'modal' }} />
+        <Stack.Screen name="Analytics" component={AnalyticsScreen} />
+        <Stack.Screen name="Thread" component={ThreadScreen} />
+        <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        <Stack.Screen name="Drafts" component={DraftsScreen} />
+        <Stack.Screen name="TeamMembers" component={TeamMembersScreen} />
+        <Stack.Screen name="Saved" component={SavedPostsScreen} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
+      </Stack.Navigator>
+    );
   }
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Tabs">
-      <Stack.Screen name="Tabs" component={TabsGate} />
-      <Stack.Screen name="SuggestedFollows" component={SuggestedFollowsScreen} />
-      <Stack.Screen name="Compose" component={ComposeScreen} options={{ presentation: 'modal' }} />
-      <Stack.Screen name="PostDetail" component={PostDetailScreen} />
-      <Stack.Screen name="BusinessProfile" component={BusinessProfileScreen} />
-      <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ presentation: 'modal' }} />
-      <Stack.Screen name="Analytics" component={AnalyticsScreen} />
-      <Stack.Screen name="Thread" component={ThreadScreen} />
-      <Stack.Screen name="Notifications" component={NotificationsScreen} />
-      <Stack.Screen name="Drafts" component={DraftsScreen} />
-      <Stack.Screen name="TeamMembers" component={TeamMembersScreen} />
-      <Stack.Screen name="Saved" component={SavedPostsScreen} />
-      <Stack.Screen name="Settings" component={SettingsScreen} />
-    </Stack.Navigator>
+    <View style={{ flex: 1 }}>
+      {content}
+      {showReopen && (
+        <ReopenIntro
+          onDone={() => {
+            hasShownReopen = true;
+            setShowReopen(false);
+          }}
+        />
+      )}
+    </View>
   );
 }
