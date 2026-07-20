@@ -10,6 +10,12 @@ export const env = {
   // Public URL of the web app, used to build links inside emails.
   appWebUrl: process.env.APP_WEB_URL || 'http://localhost:8081',
 
+  // Comma-separated list of origins allowed to call the API. Empty = allow any (local dev).
+  allowedOrigins: (process.env.ALLOWED_ORIGIN || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+
   // Error monitoring (Sentry). Off unless a DSN is provided.
   sentryDsn: process.env.SENTRY_DSN || '',
 

@@ -1,5 +1,4 @@
 import express from 'express';
-import cors from 'cors';
 import { env } from './env';
 import { authRouter } from './routes/auth';
 import { businessesRouter } from './routes/businesses';
@@ -13,19 +12,28 @@ import { UPLOAD_DIR } from './upload';
 import { prisma } from './db';
 import { setupRealtime } from './realtime';
 import { initSentry, sentryEnabled, Sentry } from './observability';
+import { helmetMiddleware, corsMiddleware, authLimiter, apiLimiter } from './security';
 
 // Initialize error monitoring before anything else (no-op unless SENTRY_DSN is set).
 initSentry();
 
 export const app = express();
 
-app.use(cors());
+// Behind a single hosting proxy (e.g. Railway) so rate limiting sees the real client IP.
+if (env.nodeEnv === 'production') app.set('trust proxy', 1);
+
+app.use(helmetMiddleware);
+app.use(corsMiddleware);
 app.use(express.json());
+
+// Static media is served before the rate limiter so image/video requests aren't throttled.
 app.use('/uploads', express.static(UPLOAD_DIR));
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
-app.use('/auth', authRouter);
+app.use(apiLimiter);
+
+app.use('/auth', authLimiter, authRouter);
 app.use('/businesses', businessesRouter);
 app.use('/posts', postsRouter);
 app.use('/analytics', analyticsRouter);

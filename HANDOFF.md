@@ -144,11 +144,14 @@ This is a user-generated-content platform, so before public launch you need a la
 minimum: a registered DMCA agent, a privacy policy that matches what you actually collect (GDPR/CCPA),
 content/community guidelines, and age gating. **Do not launch to the public on the drafts alone.**
 
-### 4.8 Basic security hardening
-- Rate-limit auth + write endpoints (e.g. `express-rate-limit`).
-- Confirm inputs are validated (the app uses `zod` in places — extend to all write routes).
-- HTTPS everywhere (hosts above give you this).
-- Rotate `JWT_SECRET` and any keys that were ever in a shared `.env`.
+### 4.8 Basic security hardening — DONE (see `server/src/security.ts`)
+- ✅ **Rate limiting** — `express-rate-limit`: 40/15min on auth + recovery routes (brute-force
+  protection), 600/min ceiling on the rest of the API. Skipped in the test suite.
+- ✅ **Security headers** — `helmet` (HSTS, nosniff, X-Frame-Options, etc.), configured so it
+  doesn't block cross-origin media.
+- ✅ **CORS lockdown** — set `ALLOWED_ORIGIN` to your web domain in production (open in dev).
+- ✅ **Input validation** — write routes validate with `zod`.
+- Still on you: **rotate `JWT_SECRET`** to a strong value in prod, and HTTPS (the hosts provide it).
 
 ---
 
