@@ -39,14 +39,42 @@ const shell = (inner: string) => `
     <div style="margin-top:28px;padding-top:16px;border-top:1px solid #eee;color:#8d8371;font-size:12px;">You're receiving this because you have a Verve account.</div>
   </div>`;
 
-export function sendWelcomeEmail(business: { email: string; name: string }): Promise<void> {
+const goldButton = (href: string, label: string) =>
+  `<a href="${href}" style="display:inline-block;margin-top:12px;padding:11px 20px;border-radius:100px;background:linear-gradient(135deg,#e3b842,#c58300);color:#fff;font-weight:700;text-decoration:none;">${label}</a>`;
+
+export function sendWelcomeEmail(business: { email: string; name: string }, verifyUrl?: string): Promise<void> {
+  const verifyBlock = verifyUrl
+    ? `<p style="font-size:15px;line-height:1.6;color:#3a3426;">First, confirm your email so you don't lose access to your account:</p>${goldButton(verifyUrl, 'Confirm your email')}<div style="height:14px;"></div>`
+    : '';
   return sendEmail({
     to: business.email,
     subject: `Welcome to Verve, ${business.name}`,
     html: shell(`
       <p style="font-size:16px;line-height:1.5;">Your page <b>${business.name}</b> is live.</p>
+      ${verifyBlock}
       <p style="font-size:15px;line-height:1.6;color:#3a3426;">Post your first short video, and Verve's creativity score will start ranking it by real engagement — reach that rewards good work instead of burying it.</p>
-      <a href="${env.appWebUrl}" style="display:inline-block;margin-top:12px;padding:11px 20px;border-radius:100px;background:linear-gradient(135deg,#e3b842,#c58300);color:#fff;font-weight:700;text-decoration:none;">Open Verve</a>`),
+      ${goldButton(env.appWebUrl, 'Open Verve')}`),
+  });
+}
+
+export function sendPasswordResetEmail(opts: { to: string; resetUrl: string }): Promise<void> {
+  return sendEmail({
+    to: opts.to,
+    subject: 'Reset your Verve password',
+    html: shell(`
+      <p style="font-size:16px;line-height:1.5;">We got a request to reset your Verve password.</p>
+      <p style="font-size:15px;line-height:1.6;color:#3a3426;">Tap below to choose a new one. This link expires in 1 hour. If you didn't ask for this, you can ignore this email — your password won't change.</p>
+      ${goldButton(opts.resetUrl, 'Reset password')}`),
+  });
+}
+
+export function sendVerifyEmail(opts: { to: string; verifyUrl: string }): Promise<void> {
+  return sendEmail({
+    to: opts.to,
+    subject: 'Confirm your Verve email',
+    html: shell(`
+      <p style="font-size:16px;line-height:1.5;">Confirm your email to secure your Verve account.</p>
+      ${goldButton(opts.verifyUrl, 'Confirm your email')}`),
   });
 }
 

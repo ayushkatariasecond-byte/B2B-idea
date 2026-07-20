@@ -4,6 +4,7 @@ import fs from 'fs';
 import { app } from '../index';
 import { prisma } from '../db';
 import { UPLOAD_DIR } from '../upload';
+import { makeResetToken, makeVerifyToken } from '../authTokens';
 
 async function signup(handle: string) {
   const res = await request(app).post('/auth/signup').send({
@@ -576,4 +577,51 @@ describe('Verve API', () => {
     expect(fs.existsSync(transcodedPath)).toBe(true);
     expect(fs.statSync(transcodedPath).size).toBeGreaterThan(0);
   }, 20000);
+
+  it('forgot-password responds 200 whether or not the email exists (no user enumeration)', async () => {
+    await signup('forgotme');
+    const known = await request(app).post('/auth/forgot-password').send({ email: 'forgotme@test.com' });
+    const unknown = await request(app).post('/auth/forgot-password').send({ email: 'nobody@test.com' });
+    expect(known.status).toBe(200);
+    expect(unknown.status).toBe(200);
+    expect(known.body).toEqual(unknown.body);
+  });
+
+  it('resets the password with a valid token and rejects reuse of the old link', async () => {
+    const { business } = await signup('resetme');
+    const before = await prisma.business.findUnique({ where: { id: business.id } });
+    const token = makeResetToken(business.id, before!.passwordHash);
+
+    const reset = await request(app).post('/auth/reset-password').send({ token, password: 'brandnewpass1' });
+    expect(reset.status).toBe(200);
+
+    // Old password no longer works, new one does.
+    const oldLogin = await request(app).post('/auth/login').send({ email: 'resetme@test.com', password: 'password123' });
+    expect(oldLogin.status).toBe(401);
+    const newLogin = await request(app).post('/auth/login').send({ email: 'resetme@test.com', password: 'brandnewpass1' });
+    expect(newLogin.status).toBe(200);
+
+    // The same link can't be replayed — the hash it was signed against has changed.
+    const replay = await request(app).post('/auth/reset-password').send({ token, password: 'yetanotherpass1' });
+    expect(replay.status).toBe(400);
+  });
+
+  it('rejects a garbage reset token', async () => {
+    const res = await request(app).post('/auth/reset-password').send({ token: 'not-a-real-token', password: 'whateverpass1' });
+    expect(res.status).toBe(400);
+  });
+
+  it('verifies email with a valid token and ignores an invalid one', async () => {
+    const { business } = await signup('verifyme');
+    const fresh = await prisma.business.findUnique({ where: { id: business.id } });
+    expect(fresh!.emailVerified).toBe(false);
+
+    const ok = await request(app).post('/auth/verify-email').send({ token: makeVerifyToken(business.id) });
+    expect(ok.status).toBe(200);
+    const after = await prisma.business.findUnique({ where: { id: business.id } });
+    expect(after!.emailVerified).toBe(true);
+
+    const bad = await request(app).post('/auth/verify-email').send({ token: 'bogus.token.here' });
+    expect(bad.status).toBe(400);
+  });
 });

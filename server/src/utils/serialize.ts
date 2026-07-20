@@ -10,6 +10,7 @@ type BusinessLike = {
   coverUrl: string | null;
   verified: boolean;
   verificationRequested: boolean;
+  emailVerified?: boolean;
   createdAt: Date;
 };
 
@@ -24,6 +25,7 @@ export function serializeBusiness(b: BusinessLike, extra: Record<string, unknown
     coverUrl: b.coverUrl,
     verified: b.verified,
     verificationRequested: b.verificationRequested,
+    emailVerified: b.emailVerified ?? false,
     createdAt: b.createdAt,
     ...extra,
   };

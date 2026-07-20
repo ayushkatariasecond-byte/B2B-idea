@@ -19,6 +19,7 @@ model Business {
   coverUrl               String?
   verified               Boolean  @default(false)
   verificationRequested  Boolean  @default(false)
+  emailVerified          Boolean  @default(false)
   expoPushToken          String?
   createdAt              DateTime @default(now())
 

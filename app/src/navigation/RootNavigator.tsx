@@ -12,6 +12,9 @@ import { ReopenIntro } from '../screens/ReopenIntro';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { SignupScreen } from '../screens/SignupScreen';
 import { LoginScreen } from '../screens/LoginScreen';
+import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
+import { ResetPasswordScreen } from '../screens/ResetPasswordScreen';
+import { VerifyEmailScreen } from '../screens/VerifyEmailScreen';
 import { SuggestedFollowsScreen } from '../screens/SuggestedFollowsScreen';
 import { ComposeScreen } from '../screens/ComposeScreen';
 import { PostDetailScreen } from '../screens/PostDetailScreen';
@@ -76,6 +79,9 @@ export function RootNavigator() {
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         <Stack.Screen name="Signup" component={SignupScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+        <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+        <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
         <Stack.Screen name="PostDetail" component={PostDetailScreen} />
         <Stack.Screen name="BusinessProfile" component={BusinessProfileScreen} />
       </Stack.Navigator>
@@ -96,6 +102,8 @@ export function RootNavigator() {
         <Stack.Screen name="TeamMembers" component={TeamMembersScreen} />
         <Stack.Screen name="Saved" component={SavedPostsScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+        <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
       </Stack.Navigator>
     );
   }

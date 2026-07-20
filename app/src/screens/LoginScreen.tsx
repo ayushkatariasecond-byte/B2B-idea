@@ -46,6 +46,10 @@ export function LoginScreen({ navigation }: Props) {
 
         {error && <Text style={styles.error}>{error}</Text>}
 
+        <Text style={styles.forgot} onPress={() => navigation.navigate('ForgotPassword')} accessibilityRole="button">
+          Forgot password?
+        </Text>
+
         <PrimaryButton label="Log in" onPress={submit} loading={loading} style={styles.submit} />
         <Text style={styles.switchText} onPress={() => navigation.navigate('Signup')}>
           New to Verve? <Text style={styles.switchLink}>Create a page</Text>
@@ -62,6 +66,7 @@ const styles = StyleSheet.create({
   subtitle: { fontFamily: fonts.body.regular, fontSize: 14, color: colors.inkSoft },
   form: { gap: 14 },
   error: { color: '#b3261e', fontFamily: fonts.body.semiBold, fontSize: 13 },
+  forgot: { alignSelf: 'flex-end', color: colors.gold, fontFamily: fonts.body.bold, fontSize: 13 },
   submit: { marginTop: 4 },
   switchText: { textAlign: 'center', fontFamily: fonts.body.medium, fontSize: 13, color: colors.inkSoft },
   switchLink: { color: colors.gold, fontFamily: fonts.body.bold },
