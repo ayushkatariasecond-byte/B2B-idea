@@ -66,9 +66,33 @@ Seed demo data if you want content: `cd server && npm run seed`.
 
 ---
 
+## 3.5 Already provisioned & wired (production services)
+
+The backend is now integrated with Postgres, error monitoring, and email. Each integration is
+**env-guarded** — it stays off (and local dev keeps using SQLite + local disk) until you set the
+variables on your host. Code: `server/src/observability.ts` (Sentry), `server/src/email.ts`
+(SendGrid), `server/src/storage.ts` (Supabase Storage). All values go in the host's env vars — see
+`server/.env.example`.
+
+- **Postgres (Supabase `verve-prod`)** — project created and the full schema (all 15 tables) is
+  applied and verified. To use it: set `provider = "postgresql"` in `prisma/schema.prisma`, set
+  `DATABASE_URL` to the Supabase connection string, and deploy. The schema already matches, so
+  `prisma db push` (the server's `predev` fallback) reconciles as a no-op.
+- **Sentry** — org `verve` / project `verve-api` created, DSN issued and tested (a live event was
+  received). Set `SENTRY_DSN` to turn it on.
+- **SendGrid** — sender `ayushkatariasecond@gmail.com` verified; a live test email was delivered.
+  Wired to send a welcome email on signup and an invite email to new team members. Generate a
+  SendGrid **API key** and set `SENDGRID_API_KEY` to turn on real sending in production.
+
+**Remaining manual steps (need dashboard access I can't script):**
+1. Generate a **SendGrid API key** (dashboard → Settings → API Keys) → `SENDGRID_API_KEY`.
+2. Create a **public Storage bucket** in the `verve-prod` Supabase project (default name `media`),
+   grab the project's `SUPABASE_URL` + **service-role key** → `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`.
+3. At deploy, flip the Prisma provider to `postgresql` and set the Supabase `DATABASE_URL`.
+
 ## 4. MUST DO before going public
 
-These are the blockers. Roughly ordered.
+These are the blockers. Roughly ordered. (Several are now largely handled — see §3.5.)
 
 ### 4.1 Move the database off SQLite → Postgres
 SQLite is a single local file — it can't handle concurrent users and is wiped on most cloud hosts.

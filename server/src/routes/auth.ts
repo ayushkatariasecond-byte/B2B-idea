@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../db';
 import { signToken, requireAuth, AuthedRequest } from '../middleware/auth';
 import { serializeBusiness } from '../utils/serialize';
+import { sendWelcomeEmail } from '../email';
 
 export const authRouter = Router();
 
@@ -37,6 +38,8 @@ authRouter.post('/signup', async (req, res) => {
   const business = await prisma.business.create({
     data: { email, passwordHash, name, handle, category, bio },
   });
+
+  void sendWelcomeEmail({ email: business.email, name: business.name });
 
   const token = signToken(business.id, null);
   res.status(201).json({ token, business: serializeBusiness(business) });

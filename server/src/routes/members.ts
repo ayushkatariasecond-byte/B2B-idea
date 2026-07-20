@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../db';
 import { requireAuth, requireOwner, AuthedRequest } from '../middleware/auth';
+import { sendTeamInviteEmail } from '../email';
 
 export const membersRouter = Router();
 
@@ -34,6 +35,10 @@ membersRouter.post('/', requireAuth, requireOwner, async (req: AuthedRequest, re
   const member = await prisma.businessMember.create({
     data: { businessId: req.businessId!, email, passwordHash, role },
   });
+
+  const business = await prisma.business.findUnique({ where: { id: req.businessId! }, select: { name: true } });
+  void sendTeamInviteEmail({ to: email, tempPassword: password, teamName: business?.name ?? 'a business' });
+
   res.status(201).json({ member: { id: member.id, email: member.email, role: member.role, createdAt: member.createdAt } });
 });
 

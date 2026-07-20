@@ -12,6 +12,10 @@ import { reportsRouter } from './routes/reports';
 import { UPLOAD_DIR } from './upload';
 import { prisma } from './db';
 import { setupRealtime } from './realtime';
+import { initSentry, sentryEnabled, Sentry } from './observability';
+
+// Initialize error monitoring before anything else (no-op unless SENTRY_DSN is set).
+initSentry();
 
 export const app = express();
 
@@ -29,6 +33,11 @@ app.use('/threads', threadsRouter);
 app.use('/team', membersRouter);
 app.use('/notifications', notificationsRouter);
 app.use('/reports', reportsRouter);
+
+// Sentry's error handler captures exceptions before our own responds (no-op if disabled).
+if (sentryEnabled()) {
+  Sentry.setupExpressErrorHandler(app);
+}
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);

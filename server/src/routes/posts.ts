@@ -8,6 +8,7 @@ import { extractHashtags } from '../utils/hashtags';
 import { getExcludedBusinessIds } from '../utils/blocking';
 import { notify } from '../utils/notifications';
 import { transcodeVideo } from '../utils/videoTranscode';
+import { persistUpload } from '../storage';
 
 export const postsRouter = Router();
 
@@ -191,12 +192,17 @@ postsRouter.post('/', requireAuth, postUpload, async (req: AuthedRequest, res) =
     }
   }
 
+  const [mediaUrl, thumbnailUrl] = await Promise.all([
+    persistUpload(mediaFilename),
+    thumbnailFile ? persistUpload(thumbnailFile.filename) : Promise.resolve(null),
+  ]);
+
   const post = await prisma.post.create({
     data: {
       businessId: req.businessId!,
-      mediaUrl: `/uploads/${mediaFilename}`,
+      mediaUrl,
       mediaType,
-      thumbnailUrl: thumbnailFile ? `/uploads/${thumbnailFile.filename}` : null,
+      thumbnailUrl,
       caption: parsed.data.caption,
       tag: parsed.data.tag,
       status: parsed.data.status,
