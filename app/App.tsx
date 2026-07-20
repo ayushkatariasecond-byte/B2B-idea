@@ -10,6 +10,9 @@ import { AlertHost } from './src/components/AlertHost';
 import { useAppFonts } from './src/theme/useAppFonts';
 import { colors } from './src/theme/tokens';
 import { RootStackParamList } from './src/navigation/types';
+import { initAppSentry, wrapApp } from './src/observability';
+
+initAppSentry();
 
 // Public post/profile pages get real URLs; everything else stays app-only (no useful state to deep-link into pre-auth).
 const linking: LinkingOptions<RootStackParamList> = {
@@ -28,7 +31,7 @@ const linking: LinkingOptions<RootStackParamList> = {
   },
 };
 
-export default function App() {
+function App() {
   const [fontsLoaded] = useAppFonts();
 
   if (!fontsLoaded) {
@@ -53,3 +56,5 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+
+export default wrapApp(App);

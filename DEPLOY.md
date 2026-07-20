@@ -77,7 +77,10 @@ Railway + Vercel + Supabase accounts. Have the provisioned values from `HANDOFF.
     - **Build command:** `npx expo export --platform web`
     - **Output directory:** `dist`
     - **Install command:** `npm install`
-12. Add an **Environment Variable**: `EXPO_PUBLIC_API_URL = https://<your-railway-url>` (from step 9).
+12. Add **Environment Variables**:
+    - `EXPO_PUBLIC_API_URL = https://<your-railway-url>` (from step 9)
+    - `EXPO_PUBLIC_SENTRY_DSN = <the same SENTRY_DSN>` (optional — turns on client-side error
+      reporting from the web/mobile app; safe to expose, it's a client DSN)
 13. Deploy. Vercel gives you a URL like `https://verve.vercel.app`. Open it — you should get the
     reopen intro, then the app, talking to your live backend.
 
