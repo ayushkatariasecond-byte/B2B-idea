@@ -14,6 +14,15 @@ function writePlaceholder(filename: string, rgb: [number, number, number], accen
   return `/uploads/${filename}`;
 }
 
+const SEED_ASSET_DIR = path.join(__dirname, 'seed-assets');
+
+// Copy a committed seed image (real photography) into the served uploads dir so a
+// fresh clone + seed reproduces the same starter content without any external fetch.
+function copySeedAsset(filename: string): string {
+  fs.copyFileSync(path.join(SEED_ASSET_DIR, filename), path.join(UPLOAD_DIR, filename));
+  return `/uploads/${filename}`;
+}
+
 const GOLD: [number, number, number] = [212, 175, 100];
 
 const BUSINESSES = [
@@ -24,6 +33,7 @@ const BUSINESSES = [
     bio: "We build warehouse robots that don't take themselves too seriously. Based in Austin, shipping worldwide.",
     color: [40, 44, 52] as [number, number, number],
     posts: [
+      { caption: 'Our robotic arm learned to paint. Same motion control we use for order picking — just pointed at a canvas instead of a shelf.', tag: 'Product Launch', asset: 'novarobotics-real-1.png' },
       { caption: 'We taught a warehouse arm to dance. Turns out efficiency looks good with rhythm.', tag: 'Product Launch' },
       { caption: 'Behind the scenes: calibrating 40 arms before the trade show floor opened.', tag: 'Behind the Build' },
     ],
@@ -35,6 +45,7 @@ const BUSINESSES = [
     bio: 'Dashboards your whole team will actually open. No SQL required.',
     color: [24, 58, 74] as [number, number, number],
     posts: [
+      { caption: 'We rebuilt the entire dashboard live on stage in 40 minutes. No slides, no cuts — just the product and a very nervous engineer.', tag: 'Behind the Build', asset: 'fathomhq-real-1.png' },
       { caption: 'Our engineers rebuilt the dashboard live on stage in 40 minutes. No cuts.', tag: 'Behind the Build' },
       { caption: 'What happens when you give finance a real-time revenue graph? Chaos. Good chaos.', tag: 'Culture' },
     ],
@@ -56,6 +67,7 @@ const BUSINESSES = [
     bio: 'Infra that scales before your traffic spike, not after.',
     color: [70, 30, 26] as [number, number, number],
     posts: [
+      { caption: 'This is what zero-downtime looks like at 3am: 12,000 containers migrated, not a single alert fired.', tag: 'Case Study', asset: 'cindercloud-real-1.png' },
       { caption: 'Our on-call rotation now includes a trophy. Petty? Maybe. Effective? Very.', tag: 'Culture' },
       { caption: 'We migrated 12,000 containers with zero downtime. Here is the runbook.', tag: 'Case Study' },
     ],
@@ -67,6 +79,7 @@ const BUSINESSES = [
     bio: 'Job site software for crews who would rather be building than filing paperwork.',
     color: [52, 52, 58] as [number, number, number],
     posts: [
+      { caption: 'A foreman ran his whole crew schedule from the job site — tablet in one hand, coffee in the other. No laptop, no office.', tag: 'Customer Story', asset: 'buildops-real-1.png' },
       { caption: 'A foreman ran an entire crew schedule from his truck. No laptop. No office.', tag: 'Customer Story' },
     ],
   },
@@ -114,10 +127,12 @@ async function main() {
     let i = 0;
     for (const p of biz.posts) {
       i += 1;
+      const asset = (p as { asset?: string }).asset;
+      const mediaUrl = asset ? copySeedAsset(asset) : writePlaceholder(`${biz.handle}-post-${i}.png`, biz.color, GOLD);
       await prisma.post.create({
         data: {
           businessId: business.id,
-          mediaUrl: writePlaceholder(`${biz.handle}-post-${i}.png`, biz.color, GOLD),
+          mediaUrl,
           mediaType: 'image',
           caption: p.caption,
           tag: p.tag,
