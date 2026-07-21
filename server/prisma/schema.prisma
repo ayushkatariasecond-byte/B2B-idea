@@ -39,6 +39,8 @@ model Business {
   blocksMade      Block[]         @relation("Blocker")
   blocksReceived  Block[]         @relation("Blocked")
   reportsFiled    Report[]
+  stories         Story[]
+  storyViews      StoryView[]
 }
 
 model BusinessMember {
@@ -76,6 +78,33 @@ model Post {
   @@index([businessId])
   @@index([tag])
   @@index([status])
+}
+
+model Story {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id])
+  mediaUrl   String
+  mediaType  String   // "image" | "video"
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+
+  views StoryView[]
+
+  @@index([businessId])
+  @@index([expiresAt])
+}
+
+model StoryView {
+  id       String   @id @default(cuid())
+  storyId  String
+  story    Story    @relation(fields: [storyId], references: [id])
+  viewerId String
+  viewer   Business @relation(fields: [viewerId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([storyId, viewerId])
+  @@index([storyId])
 }
 
 model Hashtag {
