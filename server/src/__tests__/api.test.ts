@@ -28,6 +28,20 @@ async function createPost(token: string, overrides: Record<string, string> = {})
   return req.attach('media', path.join(__dirname, 'fixtures', 'sample.png'));
 }
 
+/** Walks every page of the For You feed and returns post ids in ranked order, so ranking
+ * tests can check relative order between two posts without assuming they both land on page 1. */
+async function fetchForYouOrder(token?: string): Promise<string[]> {
+  const ids: string[] = [];
+  for (let page = 1; page <= 20; page++) {
+    let req = request(app).get(`/posts/feed?tab=forYou&page=${page}`);
+    if (token) req = req.set('Authorization', `Bearer ${token}`);
+    const res = await req;
+    ids.push(...res.body.posts.map((p: { id: string }) => p.id));
+    if (!res.body.hasMore) break;
+  }
+  return ids;
+}
+
 describe('Verve API', () => {
   afterAll(async () => {
     await prisma.$disconnect();
@@ -652,5 +666,207 @@ describe('Verve API', () => {
       category: 'Testing',
     });
     expect(dupeRes.status).toBe(409);
+  });
+
+  // --- Stories ---
+
+  async function createStory(token: string) {
+    return request(app)
+      .post('/stories')
+      .set('Authorization', `Bearer ${token}`)
+      .attach('media', path.join(__dirname, 'fixtures', 'sample.png'));
+  }
+
+  it('creates a story and it appears in GET /stories as unseen for another viewer', async () => {
+    const author = await signup('storyauthor1');
+    const viewer = await signup('storyviewer1');
+
+    const createRes = await createStory(author.token);
+    expect(createRes.status).toBe(201);
+    expect(createRes.body.story.businessId).toBe(author.business.id);
+    expect(createRes.body.story.mediaUrl).toMatch(/^\/uploads\//);
+
+    const listRes = await request(app).get('/stories').set('Authorization', `Bearer ${viewer.token}`);
+    expect(listRes.status).toBe(200);
+    const group = listRes.body.groups.find((g: { business: { id: string } }) => g.business.id === author.business.id);
+    expect(group).toBeTruthy();
+    expect(group.hasUnseen).toBe(true);
+    expect(
+      group.stories.some((s: { id: string; viewedByMe: boolean }) => s.id === createRes.body.story.id && s.viewedByMe === false)
+    ).toBe(true);
+  });
+
+  it('rejects story creation without a media file', async () => {
+    const { token } = await signup('storynomedia');
+    const res = await request(app).post('/stories').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(400);
+  });
+
+  it('marks a story viewed idempotently and reflects viewedByMe/hasUnseen afterward', async () => {
+    const author = await signup('storyauthor2');
+    const viewer = await signup('storyviewer2');
+    const createRes = await createStory(author.token);
+
+    const view1 = await request(app)
+      .post(`/stories/${createRes.body.story.id}/view`)
+      .set('Authorization', `Bearer ${viewer.token}`);
+    expect(view1.status).toBe(200);
+    expect(view1.body).toEqual({ ok: true });
+
+    // Viewing again must not error — it's idempotent.
+    const view2 = await request(app)
+      .post(`/stories/${createRes.body.story.id}/view`)
+      .set('Authorization', `Bearer ${viewer.token}`);
+    expect(view2.status).toBe(200);
+
+    const listRes = await request(app).get('/stories').set('Authorization', `Bearer ${viewer.token}`);
+    const group = listRes.body.groups.find((g: { business: { id: string } }) => g.business.id === author.business.id);
+    expect(group.hasUnseen).toBe(false);
+    const story = group.stories.find((s: { id: string }) => s.id === createRes.body.story.id);
+    expect(story.viewedByMe).toBe(true);
+  });
+
+  it('404s viewing a story that does not exist', async () => {
+    const { token } = await signup('storyviewer3');
+    const res = await request(app).post('/stories/nonexistent-id/view').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(404);
+  });
+
+  it('excludes an expired story from GET /stories', async () => {
+    const author = await signup('storyauthor3');
+    const createRes = await createStory(author.token);
+    await prisma.story.update({
+      where: { id: createRes.body.story.id },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    });
+
+    const listRes = await request(app).get('/stories');
+    expect(
+      listRes.body.groups.some((g: { stories: { id: string }[] }) =>
+        g.stories.some((s) => s.id === createRes.body.story.id)
+      )
+    ).toBe(false);
+  });
+
+  it('excludes a blocked business\'s stories from GET /stories', async () => {
+    const blocker = await signup('storyblocker1');
+    const blocked = await signup('storyblocked1');
+    await createStory(blocked.token);
+    await request(app).post(`/businesses/${blocked.business.id}/block`).set('Authorization', `Bearer ${blocker.token}`);
+
+    const listRes = await request(app).get('/stories').set('Authorization', `Bearer ${blocker.token}`);
+    expect(listRes.body.groups.some((g: { business: { id: string } }) => g.business.id === blocked.business.id)).toBe(false);
+  });
+
+  it('orders groups: own story first, then followed businesses, then everyone else', async () => {
+    const me = await signup('storyorderme');
+    const followed = await signup('storyorderfollowed');
+    const stranger = await signup('storyorderstranger');
+
+    await createStory(stranger.token);
+    await createStory(followed.token);
+    await createStory(me.token);
+    await request(app).post(`/businesses/${followed.business.id}/follow`).set('Authorization', `Bearer ${me.token}`);
+
+    const listRes = await request(app).get('/stories').set('Authorization', `Bearer ${me.token}`);
+    const ids = listRes.body.groups.map((g: { business: { id: string } }) => g.business.id);
+    const meIdx = ids.indexOf(me.business.id);
+    const followedIdx = ids.indexOf(followed.business.id);
+    const strangerIdx = ids.indexOf(stranger.business.id);
+    expect(meIdx).toBeLessThan(followedIdx);
+    expect(followedIdx).toBeLessThan(strangerIdx);
+  });
+
+  it('works for logged-out viewers without personalization', async () => {
+    const author = await signup('storyanon1');
+    const createRes = await createStory(author.token);
+
+    const listRes = await request(app).get('/stories');
+    expect(listRes.status).toBe(200);
+    const group = listRes.body.groups.find((g: { business: { id: string } }) => g.business.id === author.business.id);
+    expect(group).toBeTruthy();
+    expect(group.hasUnseen).toBe(true);
+    const story = group.stories.find((s: { id: string }) => s.id === createRes.body.story.id);
+    expect(story.viewedByMe).toBe(false);
+  });
+
+  it('creates a video story using the shared transcode pipeline', async () => {
+    const { token } = await signup('storyvideo1');
+    const res = await request(app)
+      .post('/stories')
+      .set('Authorization', `Bearer ${token}`)
+      .attach('media', path.join(__dirname, 'fixtures', 'sample.mp4'));
+    expect(res.status).toBe(201);
+    expect(res.body.story.mediaType).toBe('video');
+    expect(res.body.story.mediaUrl).toMatch(/-web\.mp4$/);
+  }, 20000);
+
+  it('For You: ranks a fresher post above an equally-engaged older post from the same business', async () => {
+    const author = await signup('rankfreshold');
+    const oldPost = await createPost(author.token, { caption: 'Equal engagement post either way', tag: 'Culture' });
+    const freshPost = await createPost(author.token, { caption: 'Equal engagement post either way', tag: 'Culture' });
+    // Neither post has any likes/comments/shares, so their base creativity scores are
+    // identical — only the recency/velocity boosts (which depend on age) can separate them.
+    await prisma.post.update({
+      where: { id: oldPost.body.post.id },
+      data: { createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000) },
+    });
+
+    const order = await fetchForYouOrder(author.token);
+    const freshIdx = order.indexOf(freshPost.body.post.id);
+    const oldIdx = order.indexOf(oldPost.body.post.id);
+    expect(freshIdx).toBeGreaterThanOrEqual(0);
+    expect(oldIdx).toBeGreaterThanOrEqual(0);
+    expect(freshIdx).toBeLessThan(oldIdx);
+  });
+
+  it('For You: boosts a followed business post above an equal-scored post from a business the viewer does not follow', async () => {
+    const viewer = await signup('rankfollowviewer');
+    const followedBiz = await signup('rankfollowfollowed');
+    const stranger = await signup('rankfollowstranger');
+
+    const followedPost = await createPost(followedBiz.token, { caption: 'Same caption for a fair fight', tag: 'Culture' });
+    const strangerPost = await createPost(stranger.token, { caption: 'Same caption for a fair fight', tag: 'Culture' });
+    await request(app).post(`/businesses/${followedBiz.business.id}/follow`).set('Authorization', `Bearer ${viewer.token}`);
+
+    const order = await fetchForYouOrder(viewer.token);
+    const followedIdx = order.indexOf(followedPost.body.post.id);
+    const strangerIdx = order.indexOf(strangerPost.body.post.id);
+    expect(followedIdx).toBeGreaterThanOrEqual(0);
+    expect(strangerIdx).toBeGreaterThanOrEqual(0);
+    expect(followedIdx).toBeLessThan(strangerIdx);
+  });
+
+  it('For You: diversity cap limits one business to at most 3 posts on a single page even when it has more qualifying posts', async () => {
+    const dominant = await signup('rankdiversedom');
+    const boosters = await Promise.all([
+      signup('rankdiverseb1'),
+      signup('rankdiverseb2'),
+      signup('rankdiverseb3'),
+    ]);
+
+    const dominantPostIds: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const post = await createPost(dominant.token, { caption: `A bold hook for dominant post ${i}!`, tag: 'Culture' });
+      dominantPostIds.push(post.body.post.id);
+      // Likes push score + velocity well above baseline noise, so without the diversity
+      // cap all 5 of this business's posts would rank ahead of the other businesses' posts.
+      for (const booster of boosters) {
+        await request(app).post(`/posts/${post.body.post.id}/like`).set('Authorization', `Bearer ${booster.token}`);
+      }
+    }
+    for (const booster of boosters) {
+      await createPost(booster.token, { caption: 'A normal post from another business', tag: 'Culture' });
+    }
+
+    const feedRes = await request(app).get('/posts/feed?tab=forYou');
+    expect(feedRes.status).toBe(200);
+    const dominantOnPage = feedRes.body.posts.filter((p: { businessId: string }) => p.businessId === dominant.business.id);
+    expect(dominantOnPage.length).toBeLessThanOrEqual(3);
+
+    // The cap reorders, it doesn't drop — all 5 posts must still be reachable across pages.
+    const allIds = await fetchForYouOrder();
+    const dominantTotal = dominantPostIds.filter((id) => allIds.includes(id)).length;
+    expect(dominantTotal).toBe(5);
   });
 });

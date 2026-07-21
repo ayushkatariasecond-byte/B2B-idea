@@ -9,6 +9,7 @@ import { getExcludedBusinessIds } from '../utils/blocking';
 import { notify } from '../utils/notifications';
 import { transcodeVideo } from '../utils/videoTranscode';
 import { persistUpload } from '../storage';
+import { recencyBoost, velocityBoost, explorationJitter, currentHourBucket, diversify } from '../utils/ranking';
 
 export const postsRouter = Router();
 
@@ -61,16 +62,78 @@ postsRouter.get('/feed', optionalAuth, async (req: AuthedRequest, res) => {
     return res.json({ posts: posts.map(serializePost), page, hasMore: posts.length === PAGE_SIZE });
   }
 
-  // For You: ranked by live creativity score, rewarding engaging/creative posts over recency.
+  // For You: a bounded candidate pool (still recency-ordered so we don't do a full
+  // table scan), then re-ranked by a real `finalScore` — see utils/ranking.ts for the
+  // rationale behind each term. Personalization (follow/top-tag boosts) only applies
+  // when the viewer is authenticated; anonymous viewers get the same ranking minus
+  // those two terms, same as how the Following tab already gates on req.businessId.
   const all = await prisma.post.findMany({
     where: { ...visibilityWhere(), businessId: { notIn: excluded } },
     orderBy: { createdAt: 'desc' },
     take: 300,
     include: postInclude(req.businessId),
   });
-  const serialized = all.map(serializePost).sort((a, b) => b.score - a.score || (b.createdAt > a.createdAt ? 1 : -1));
-  const pageItems = serialized.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  res.json({ posts: pageItems, page, hasMore: page * PAGE_SIZE < serialized.length });
+
+  // Personalization signals — both are skipped entirely (left as empty/undefined) for
+  // anonymous requests, matching the optionalAuth pattern used throughout this route.
+  let followedIds: Set<string> = new Set();
+  let topTag: string | undefined;
+  if (req.businessId) {
+    const followed = await prisma.follow.findMany({ where: { followerId: req.businessId }, select: { followeeId: true } });
+    followedIds = new Set(followed.map((f) => f.followeeId));
+
+    // Cheap approximation of "what does this viewer like": their most recent 200 likes,
+    // grouped by the liked post's tag in JS. Bounded take() avoids an unbounded
+    // full-table aggregate; 200 is plenty to find a viewer's dominant interest.
+    const recentLikes = await prisma.like.findMany({
+      where: { businessId: req.businessId },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+      select: { post: { select: { tag: true } } },
+    });
+    if (recentLikes.length > 0) {
+      const tagCounts = new Map<string, number>();
+      for (const like of recentLikes) {
+        tagCounts.set(like.post.tag, (tagCounts.get(like.post.tag) ?? 0) + 1);
+      }
+      let bestTag: string | undefined;
+      let bestCount = 0;
+      for (const [tag, count] of tagCounts) {
+        if (count > bestCount) {
+          bestCount = count;
+          bestTag = tag;
+        }
+      }
+      topTag = bestTag;
+    }
+  }
+
+  const now = Date.now();
+  const hourBucket = currentHourBucket(now);
+  const ranked = all.map((post) => {
+    const serialized = serializePost(post);
+    const ageHours = (now - post.createdAt.getTime()) / (1000 * 60 * 60);
+
+    let personalization = 0;
+    if (req.businessId) {
+      if (followedIds.has(post.businessId)) personalization += 15;
+      if (topTag && post.tag === topTag) personalization += 8;
+    }
+
+    const finalScore =
+      serialized.score +
+      recencyBoost(ageHours) +
+      velocityBoost(serialized.likeCount, serialized.commentCount, serialized.shareCount, ageHours) +
+      personalization +
+      explorationJitter(req.businessId, post.id, hourBucket);
+
+    return { ...serialized, finalScore };
+  });
+
+  ranked.sort((a, b) => b.finalScore - a.finalScore || (b.createdAt > a.createdAt ? 1 : -1));
+  const diversified = diversify(ranked, 3, PAGE_SIZE);
+  const pageItems = diversified.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(({ finalScore, ...post }) => post);
+  res.json({ posts: pageItems, page, hasMore: page * PAGE_SIZE < diversified.length });
 });
 
 postsRouter.get('/discover', optionalAuth, async (req: AuthedRequest, res) => {
