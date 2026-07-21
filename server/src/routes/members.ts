@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../db';
 import { requireAuth, requireOwner, AuthedRequest } from '../middleware/auth';
 import { sendTeamInviteEmail } from '../email';
+import { emailSchema } from '../utils/email';
 
 export const membersRouter = Router();
 
@@ -16,7 +17,7 @@ membersRouter.get('/', requireAuth, async (req: AuthedRequest, res) => {
 });
 
 const inviteSchema = z.object({
-  email: z.string().email(),
+  email: emailSchema,
   password: z.string().min(8, 'Password must be at least 8 characters'),
   role: z.enum(['editor']).optional().default('editor'),
 });

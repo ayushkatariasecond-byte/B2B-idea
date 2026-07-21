@@ -624,4 +624,33 @@ describe('Verve API', () => {
     const bad = await request(app).post('/auth/verify-email').send({ token: 'bogus.token.here' });
     expect(bad.status).toBe(400);
   });
+
+  it('logs in regardless of email casing, and stores/looks up email normalized to lowercase', async () => {
+    const signupRes = await request(app).post('/auth/signup').send({
+      email: 'MixedCase@Example.com',
+      password: 'password123',
+      name: 'Mixed Case Inc',
+      handle: 'mixedcase',
+      category: 'Testing',
+    });
+    expect(signupRes.status).toBe(201);
+    // Stored normalized, not as typed.
+    expect(signupRes.body.business.id).toBeTruthy();
+    const stored = await prisma.business.findUnique({ where: { id: signupRes.body.business.id } });
+    expect(stored!.email).toBe('mixedcase@example.com');
+
+    // Logging in with a totally different casing than either the signup input or storage still works.
+    const loginRes = await request(app).post('/auth/login').send({ email: 'MIXEDCASE@EXAMPLE.COM', password: 'password123' });
+    expect(loginRes.status).toBe(200);
+
+    // Signing up again with the same email in yet another casing is rejected as a duplicate.
+    const dupeRes = await request(app).post('/auth/signup').send({
+      email: 'mixedCase@example.COM',
+      password: 'password123',
+      name: 'Dupe Inc',
+      handle: 'mixedcasedupe',
+      category: 'Testing',
+    });
+    expect(dupeRes.status).toBe(409);
+  });
 });

@@ -12,6 +12,7 @@
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
     "seed": "ts-node --transpile-only prisma/seed.ts",
+    "fix:normalize-emails": "ts-node --transpile-only scripts/normalizeEmails.ts",
     "test": "jest --runInBand"
   },
   "dependencies": {

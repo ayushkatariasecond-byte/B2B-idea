@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../db';
 import { signToken, requireAuth, AuthedRequest } from '../middleware/auth';
 import { serializeBusiness } from '../utils/serialize';
+import { emailSchema } from '../utils/email';
 import { env } from '../env';
 import { sendWelcomeEmail, sendPasswordResetEmail, sendVerifyEmail } from '../email';
 import { makeResetToken, readResetSubject, verifyResetToken, makeVerifyToken, verifyVerifyToken } from '../authTokens';
@@ -11,7 +12,7 @@ import { makeResetToken, readResetSubject, verifyResetToken, makeVerifyToken, ve
 export const authRouter = Router();
 
 const signupSchema = z.object({
-  email: z.string().email(),
+  email: emailSchema,
   password: z.string().min(8, 'Password must be at least 8 characters'),
   name: z.string().min(2).max(80),
   handle: z
@@ -49,7 +50,7 @@ authRouter.post('/signup', async (req, res) => {
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: emailSchema,
   password: z.string().min(1),
 });
 
@@ -110,7 +111,7 @@ authRouter.get('/me', requireAuth, async (req: AuthedRequest, res) => {
 });
 
 // ── Password reset ─────────────────────────────────────────────────────────
-const forgotSchema = z.object({ email: z.string().email() });
+const forgotSchema = z.object({ email: emailSchema });
 
 authRouter.post('/forgot-password', async (req, res) => {
   const parsed = forgotSchema.safeParse(req.body);

@@ -191,8 +191,9 @@ That gets a public **website** live. Native app-store apps are a separate track 
 | Migrations | `server/prisma/migrations/` | regenerate for Postgres |
 | Uploads (ephemeral!) | `server/src/upload.ts`, `index.ts:20` | move to object storage |
 | JWT secret default | `server/src/env.ts` | **must** override in prod |
-| Open CORS | `server/src/index.ts:18` | restrict to web domain |
+| CORS | `server/src/security.ts` | open in dev; set `ALLOWED_ORIGIN` in prod |
 | API URL | `app/.env` (`EXPO_PUBLIC_API_URL`) | set to prod https URL |
+| Email casing | `server/src/utils/email.ts` | all lookups now normalize to lowercase. **Run `npm run fix:normalize-emails` once against any database that had accounts created before this fix** (a fresh DB from the current schema doesn't need it — only pre-existing data). |
 | WebSockets | `server/src/realtime.ts` (`/ws`) | host must allow WS upgrades |
 | Video transcode | `server/src/utils/videoTranscode.ts` | inline; move to a queue at scale |
 | CI | `.github/workflows/ci.yml` | typecheck + tests on every push |
