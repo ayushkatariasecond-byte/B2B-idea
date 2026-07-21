@@ -12,6 +12,7 @@ interface AuthContextValue {
   clearJustSignedUp: () => void;
   signup: (input: Parameters<typeof authApi.signup>[0]) => Promise<void>;
   login: (input: Parameters<typeof authApi.login>[0]) => Promise<void>;
+  loginAsGuest: () => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
   setBusiness: (business: Business) => void;
@@ -59,6 +60,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsOwner(!res.memberRole);
   }, []);
 
+  const loginAsGuest = useCallback(async () => {
+    const res = await authApi.guest();
+    await tokenStorage.set(res.token);
+    setBusinessState(res.business);
+    setIsOwner(true);
+  }, []);
+
   const logout = useCallback(async () => {
     await tokenStorage.clear();
     setBusinessState(null);
@@ -73,8 +81,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const clearJustSignedUp = useCallback(() => setJustSignedUp(false), []);
 
   const value = useMemo(
-    () => ({ business, isLoading, isOwner, justSignedUp, clearJustSignedUp, signup, login, logout, refreshMe, setBusiness: setBusinessState }),
-    [business, isLoading, isOwner, justSignedUp, clearJustSignedUp, signup, login, logout, refreshMe]
+    () => ({ business, isLoading, isOwner, justSignedUp, clearJustSignedUp, signup, login, loginAsGuest, logout, refreshMe, setBusiness: setBusinessState }),
+    [business, isLoading, isOwner, justSignedUp, clearJustSignedUp, signup, login, loginAsGuest, logout, refreshMe]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

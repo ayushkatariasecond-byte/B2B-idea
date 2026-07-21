@@ -15,6 +15,10 @@ export function login(input: { email: string; password: string }) {
   return api.post<AuthResponse>('/auth/login', input);
 }
 
+export function guest() {
+  return api.post<AuthResponse>('/auth/guest', {});
+}
+
 export function me() {
   return api.get<{ business: Business; isOwner: boolean }>('/auth/me');
 }

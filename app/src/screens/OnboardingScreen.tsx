@@ -1,14 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { useAuth } from '../context/AuthContext';
+import { alert } from '../utils/alert';
 import { colors, fonts } from '../theme/tokens';
 import { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
 
 export function OnboardingScreen({ navigation }: Props) {
+  const { loginAsGuest } = useAuth();
+  const [guestLoading, setGuestLoading] = useState(false);
+
+  const onGuest = async () => {
+    setGuestLoading(true);
+    try {
+      await loginAsGuest();
+    } catch {
+      alert('Could not continue', 'Something went wrong starting a guest session. Please try again.');
+      setGuestLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.decorCardBack} />
@@ -33,6 +48,7 @@ export function OnboardingScreen({ navigation }: Props) {
       <View style={styles.ctaWrap}>
         <PrimaryButton label="Create your business page" onPress={() => navigation.navigate('Signup')} />
         <PrimaryButton label="I already have an account" variant="ghost" onPress={() => navigation.navigate('Login')} />
+        <PrimaryButton label="Look around as a guest" variant="ghost" loading={guestLoading} onPress={onGuest} />
       </View>
     </SafeAreaView>
   );

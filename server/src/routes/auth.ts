@@ -82,6 +82,27 @@ authRouter.post('/login', async (req, res) => {
   res.json({ token, business: serializeBusiness(memberBusiness), memberRole: member.role });
 });
 
+// Guest access: upserts one shared, pre-verified guest business and hands back a
+// token, so anyone can look around without signing up. Self-provisioning, so it
+// works on any database without a reseed.
+authRouter.post('/guest', async (_req, res) => {
+  const guest = await prisma.business.upsert({
+    where: { email: 'guest@verve.demo' },
+    update: {},
+    create: {
+      email: 'guest@verve.demo',
+      passwordHash: await bcrypt.hash('guest', 10),
+      name: 'Guest',
+      handle: 'guest',
+      category: 'Just browsing',
+      bio: 'Looking around Verve.',
+      emailVerified: true,
+    },
+  });
+  const token = signToken(guest.id, null);
+  res.json({ token, business: serializeBusiness(guest) });
+});
+
 authRouter.get('/me', requireAuth, async (req: AuthedRequest, res) => {
   const business = await prisma.business.findUnique({ where: { id: req.businessId! } });
   if (!business) return res.status(404).json({ error: 'Not found' });
