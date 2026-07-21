@@ -21,7 +21,11 @@ export type IconName =
   | 'volumeOff'
   | 'play'
   | 'arrowRight'
-  | 'bell';
+  | 'bell'
+  | 'lightning'
+  | 'bookmark'
+  | 'bookmarkFilled'
+  | 'trophy';
 
 interface IconProps {
   name: IconName;
@@ -176,6 +180,38 @@ export function Icon({ name, size = 22, color = '#000000', strokeWidth = 1.8 }: 
             strokeLinecap="round"
           />
           <Path d="M10 20a2 2 0 0 0 4 0" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+        </Svg>
+      );
+    case 'lightning':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" fill={color} />
+        </Svg>
+      );
+    case 'bookmark':
+      return (
+        <Svg width={size} height={(size * 20) / 17} viewBox="0 0 17 20">
+          <Path d="M1.5 1.5h14v17l-7-4.5-7 4.5v-17Z" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'bookmarkFilled':
+      return (
+        <Svg width={size} height={(size * 20) / 17} viewBox="0 0 17 20">
+          <Path d="M1.5 1.5h14v17l-7-4.5-7 4.5v-17Z" fill={color} />
+        </Svg>
+      );
+    case 'trophy':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path
+            d="M7 3h10v5a5 5 0 0 1-5 5 5 5 0 0 1-5-5V3Z"
+            fill="none"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeLinejoin="round"
+          />
+          <Path d="M7 4H4v2a4 4 0 0 0 3.5 4M17 4h3v2a4 4 0 0 1-3.5 4" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+          <Path d="M12 13v3M9 20h6M10 17h4l1 3H9l1-3Z" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinejoin="round" />
         </Svg>
       );
     default:

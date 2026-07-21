@@ -18,8 +18,8 @@ interface BottomNavProps {
 export function BottomNav({ active, dark }: BottomNavProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  const inactiveColor = dark ? 'rgba(255,255,255,0.6)' : colors.inkFaint2;
-  const activeColor = colors.gold;
+  const inactiveColor = dark ? 'rgba(255,255,255,0.6)' : colors.inkMuted;
+  const activeColor = colors.ink;
 
   const Container = dark ? BlurView : View;
   const containerProps = dark ? { intensity: 40, tint: 'dark' as const } : {};
@@ -89,18 +89,18 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   barDark: { backgroundColor: 'rgba(10,10,10,0.35)' },
-  barLight: { backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.line },
+  barLight: { backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.navHairline },
   item: { alignItems: 'center', justifyContent: 'center' },
   composeButton: {
-    width: 44,
-    height: 34,
-    borderRadius: 10,
+    width: 46,
+    height: 36,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.splashGlow2,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
+    shadowColor: colors.gradientGoldEnd,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
     elevation: 3,
   },
 });
