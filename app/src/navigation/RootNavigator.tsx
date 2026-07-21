@@ -19,6 +19,7 @@ import { SuggestedFollowsScreen } from '../screens/SuggestedFollowsScreen';
 import { ComposeScreen } from '../screens/ComposeScreen';
 import { PostDetailScreen } from '../screens/PostDetailScreen';
 import { BusinessProfileScreen } from '../screens/BusinessProfileScreen';
+import { FollowListScreen } from '../screens/FollowListScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
 import { AnalyticsScreen } from '../screens/AnalyticsScreen';
 import { ThreadScreen } from '../screens/ThreadScreen';
@@ -84,6 +85,7 @@ export function RootNavigator() {
         <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
         <Stack.Screen name="PostDetail" component={PostDetailScreen} />
         <Stack.Screen name="BusinessProfile" component={BusinessProfileScreen} />
+        <Stack.Screen name="FollowList" component={FollowListScreen} />
       </Stack.Navigator>
     );
   } else {
@@ -94,6 +96,7 @@ export function RootNavigator() {
         <Stack.Screen name="Compose" component={ComposeScreen} options={{ presentation: 'modal' }} />
         <Stack.Screen name="PostDetail" component={PostDetailScreen} />
         <Stack.Screen name="BusinessProfile" component={BusinessProfileScreen} />
+        <Stack.Screen name="FollowList" component={FollowListScreen} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ presentation: 'modal' }} />
         <Stack.Screen name="Analytics" component={AnalyticsScreen} />
         <Stack.Screen name="Thread" component={ThreadScreen} />

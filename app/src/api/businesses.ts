@@ -40,6 +40,14 @@ export function getBusinessPosts(businessId: string) {
   return api.get<{ posts: Post[] }>(`/businesses/${businessId}/posts`);
 }
 
+export function getFollowers(businessId: string) {
+  return api.get<{ businesses: Business[] }>(`/businesses/${businessId}/followers`);
+}
+
+export function getFollowing(businessId: string) {
+  return api.get<{ businesses: Business[] }>(`/businesses/${businessId}/following`);
+}
+
 export function searchBusinesses(q: string) {
   return api.get<{ businesses: Business[] }>(`/businesses/search?q=${encodeURIComponent(q)}`);
 }

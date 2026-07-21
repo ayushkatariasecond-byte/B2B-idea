@@ -10,6 +10,7 @@ export type RootStackParamList = {
   Compose: undefined;
   PostDetail: { postId: string };
   BusinessProfile: { businessId: string };
+  FollowList: { businessId: string; mode: 'followers' | 'following'; name?: string };
   EditProfile: undefined;
   Analytics: undefined;
   Thread: { threadId: string; otherName: string };

@@ -207,6 +207,45 @@ businessesRouter.post('/:id/block', requireAuth, async (req: AuthedRequest, res)
   res.json({ blocked: !existing });
 });
 
+// Decorate a list of businesses with follower counts and the viewer's follow state,
+// so a follower/following list can render accurate Follow buttons.
+async function decorateFollowList(businesses: { id: string }[], viewerId?: string) {
+  const ids = businesses.map((b) => b.id);
+  const [counts, myFollows] = await Promise.all([
+    prisma.follow.groupBy({ by: ['followeeId'], where: { followeeId: { in: ids } }, _count: true }),
+    viewerId
+      ? prisma.follow.findMany({ where: { followerId: viewerId, followeeId: { in: ids } }, select: { followeeId: true } })
+      : Promise.resolve([] as { followeeId: string }[]),
+  ]);
+  const countMap = new Map(counts.map((c) => [c.followeeId, c._count]));
+  const followingSet = new Set(myFollows.map((f) => f.followeeId));
+  return businesses.map((b) =>
+    serializeBusiness(b as Parameters<typeof serializeBusiness>[0], {
+      followerCount: countMap.get(b.id) ?? 0,
+      isFollowedByMe: followingSet.has(b.id),
+      isMe: viewerId === b.id,
+    })
+  );
+}
+
+businessesRouter.get('/:id/followers', optionalAuth, async (req: AuthedRequest, res) => {
+  const follows = await prisma.follow.findMany({
+    where: { followeeId: req.params.id },
+    include: { follower: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json({ businesses: await decorateFollowList(follows.map((f) => f.follower), req.businessId) });
+});
+
+businessesRouter.get('/:id/following', optionalAuth, async (req: AuthedRequest, res) => {
+  const follows = await prisma.follow.findMany({
+    where: { followerId: req.params.id },
+    include: { followee: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json({ businesses: await decorateFollowList(follows.map((f) => f.followee), req.businessId) });
+});
+
 businessesRouter.get('/:id/posts', optionalAuth, async (req: AuthedRequest, res) => {
   const posts = await prisma.post.findMany({
     where: { businessId: req.params.id, ...visibilityWhere() },

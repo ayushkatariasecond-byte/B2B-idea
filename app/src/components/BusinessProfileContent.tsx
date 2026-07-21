@@ -61,12 +61,24 @@ export function BusinessProfileContent({ business, posts, headerAction, moreActi
               <Text style={styles.statText}>
                 <Text style={styles.statNum}>{formatCount(business.postCount ?? posts.length)}</Text> posts
               </Text>
-              <Text style={styles.statText}>
-                <Text style={styles.statNum}>{formatCount(business.followerCount ?? 0)}</Text> followers
-              </Text>
-              <Text style={styles.statText}>
-                <Text style={styles.statNum}>{formatCount(business.followingCount ?? 0)}</Text> following
-              </Text>
+              <Pressable
+                onPress={() => navigation.navigate('FollowList', { businessId: business.id, mode: 'followers', name: business.name })}
+                accessibilityRole="button"
+                accessibilityLabel="View followers"
+              >
+                <Text style={styles.statText}>
+                  <Text style={styles.statNum}>{formatCount(business.followerCount ?? 0)}</Text> followers
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => navigation.navigate('FollowList', { businessId: business.id, mode: 'following', name: business.name })}
+                accessibilityRole="button"
+                accessibilityLabel="View following"
+              >
+                <Text style={styles.statText}>
+                  <Text style={styles.statNum}>{formatCount(business.followingCount ?? 0)}</Text> following
+                </Text>
+              </Pressable>
             </View>
 
             {business.isMe && (
