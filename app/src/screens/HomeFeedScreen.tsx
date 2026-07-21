@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { FeedPostCard } from '../components/FeedPostCard';
@@ -22,6 +23,7 @@ export function HomeFeedScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const viewedRef = useRef(new Set<string>());
 
@@ -32,6 +34,7 @@ export function HomeFeedScreen() {
     try {
       const res = await postsApi.getFeed(activeTab);
       setPosts(res.posts);
+      setHasMore(res.hasMore);
       setActivePostId(res.posts[0]?.id ?? null);
     } catch (e) {
       if (e instanceof ApiError && e.status === 0) {
@@ -42,6 +45,7 @@ export function HomeFeedScreen() {
         setError("Couldn't load your feed. Check your connection and try again.");
       }
       setPosts([]);
+      setHasMore(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -101,29 +105,63 @@ export function HomeFeedScreen() {
           <Text style={styles.wordmark}>
             verve<Text style={styles.wordmarkDot}>.</Text>
           </Text>
-          <Pressable
-            onPress={() => navigation.navigate('Notifications')}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel="Notifications"
-          >
-            <Icon name="bell" color={colors.ink} size={22} />
-          </Pressable>
+          <View style={styles.headerIcons}>
+            <Pressable
+              onPress={() => navigation.navigate('Notifications')}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Notifications"
+            >
+              <Icon name="bell" color={colors.ink} size={22} strokeWidth={1.7} />
+            </Pressable>
+            <Pressable
+              onPress={() => navigation.navigate('Tabs', { screen: 'Messages' } as never)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Messages"
+            >
+              <Icon name="send" color={colors.ink} size={22} />
+            </Pressable>
+          </View>
         </View>
       </SafeAreaView>
 
       <View style={styles.tabsRow}>
-        <Pressable onPress={() => setTab('following')} accessibilityRole="tab" accessibilityState={{ selected: tab === 'following' }}>
-          <Text style={[styles.tabLabel, tab === 'following' ? styles.tabActive : styles.tabInactive]}>Following</Text>
+        <Pressable onPress={() => setTab('following')} style={styles.tabItem} accessibilityRole="tab" accessibilityState={{ selected: tab === 'following' }}>
+          <Text style={[styles.tabLabel, tab === 'following' ? styles.tabLabelActive : styles.tabLabelInactive]}>Following</Text>
+          {tab === 'following' ? (
+            <LinearGradient
+              colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.tabUnderline}
+            />
+          ) : (
+            <View style={styles.tabUnderline} />
+          )}
         </Pressable>
-        <Pressable onPress={() => setTab('forYou')} accessibilityRole="tab" accessibilityState={{ selected: tab === 'forYou' }}>
-          <Text style={[styles.tabLabel, tab === 'forYou' ? styles.tabActive : styles.tabInactive]}>For You</Text>
+        <Pressable onPress={() => setTab('forYou')} style={styles.tabItem} accessibilityRole="tab" accessibilityState={{ selected: tab === 'forYou' }}>
+          <Text style={[styles.tabLabel, tab === 'forYou' ? styles.tabLabelActive : styles.tabLabelInactive]}>For You</Text>
+          {tab === 'forYou' ? (
+            <LinearGradient
+              colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.tabUnderline}
+            />
+          ) : (
+            <View style={styles.tabUnderline} />
+          )}
         </Pressable>
       </View>
 
       <StoryTray />
     </View>
   );
+
+  const endOfFeed = !hasMore ? (
+    <Text style={styles.endFeedText}>YOU'RE ALL CAUGHT UP</Text>
+  ) : null;
 
   return (
     <View style={styles.container}>
@@ -156,6 +194,7 @@ export function HomeFeedScreen() {
             />
           )}
           ListHeaderComponent={header}
+          ListFooterComponent={endOfFeed}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           onViewableItemsChanged={onViewableItemsChanged}
@@ -171,24 +210,44 @@ export function HomeFeedScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.paper },
+  container: { flex: 1, backgroundColor: colors.white },
   center: { flex: 1, alignItems: 'stretch', justifyContent: 'flex-start', paddingBottom: 32 },
   emptyText: { color: colors.inkSoft, textAlign: 'center', fontFamily: fonts.body.medium, fontSize: 15, marginTop: 40, paddingHorizontal: 32 },
   retryText: { color: colors.gold, textAlign: 'center', fontFamily: fonts.body.bold, fontSize: 14, marginTop: 14 },
   listContent: { paddingBottom: 110 },
-  topBarSafe: { backgroundColor: colors.paper },
+  topBarSafe: { backgroundColor: colors.white },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingTop: 6,
-    paddingBottom: 4,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 0,
   },
-  wordmark: { fontFamily: fonts.display.bold, fontSize: 20, letterSpacing: -0.4, color: colors.ink },
+  wordmark: { fontFamily: fonts.display.bold, fontSize: 25, letterSpacing: -0.7, color: colors.ink },
   wordmarkDot: { color: colors.gold },
-  tabsRow: { flexDirection: 'row', justifyContent: 'center', gap: 26, paddingTop: 6, paddingBottom: 4 },
-  tabLabel: { fontFamily: fonts.display.semiBold, fontSize: 16, paddingBottom: 8 },
-  tabActive: { color: colors.ink, fontFamily: fonts.display.bold, borderBottomWidth: 2, borderBottomColor: colors.gold },
-  tabInactive: { color: colors.inkFaint2 },
+  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  tabsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 30,
+    paddingTop: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.hairline,
+  },
+  tabItem: { alignItems: 'center' },
+  tabLabel: { fontFamily: fonts.display.semiBold, fontSize: 15 },
+  tabLabelActive: { color: colors.ink, fontFamily: fonts.display.bold },
+  tabLabelInactive: { color: colors.inkFaint, fontFamily: fonts.display.semiBold },
+  tabUnderline: { width: 26, height: 2.5, borderRadius: 2, marginTop: 7, backgroundColor: 'transparent' },
+  endFeedText: {
+    textAlign: 'center',
+    paddingTop: 22,
+    paddingBottom: 8,
+    fontSize: 11,
+    fontFamily: fonts.body.extraBold,
+    letterSpacing: 2.5,
+    color: colors.endFeedText,
+  },
 });

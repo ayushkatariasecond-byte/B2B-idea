@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Avatar } from './Avatar';
@@ -38,19 +39,28 @@ export function BusinessProfileContent({ business, posts, headerAction, moreActi
       ListHeaderComponent={
         <View>
           <View style={styles.cover}>
-            {coverUri ? <Image source={{ uri: coverUri }} style={styles.coverImage} contentFit="cover" /> : <View style={styles.coverPlaceholder} />}
+            {coverUri && <Image source={{ uri: coverUri }} style={styles.coverImage} contentFit="cover" />}
             {moreAction && <View style={styles.moreWrap}>{moreAction}</View>}
           </View>
 
           <View style={styles.body}>
             <View style={styles.avatarRow}>
-              <Avatar uri={business.avatarUrl} name={business.name} size={76} borderColor={colors.white} borderWidth={4} />
+              <LinearGradient
+                colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.avatarRing}
+              >
+                <View style={styles.avatarInnerBorder}>
+                  <Avatar uri={business.avatarUrl} name={business.name} size={70} />
+                </View>
+              </LinearGradient>
               {headerAction}
             </View>
 
             <View style={styles.nameRow}>
               <Text style={styles.name}>{business.name}</Text>
-              {business.verified && <Icon name="checkBadge" color={colors.gold} size={16} />}
+              {business.verified && <Icon name="checkBadge" color={colors.gold} size={17} />}
             </View>
             <Text style={styles.handle}>
               {'@' + business.handle} · {business.category}
@@ -83,7 +93,7 @@ export function BusinessProfileContent({ business, posts, headerAction, moreActi
 
             {business.isMe && (
               <Pressable style={styles.analyticsButton} onPress={() => navigation.navigate('Analytics')}>
-                <Icon name="barChart" color={colors.goldDeep} size={16} />
+                <Icon name="barChart" color={colors.gradientGoldEnd} size={16} />
                 <Text style={styles.analyticsButtonText}>View Analytics</Text>
               </Pressable>
             )}
@@ -110,7 +120,13 @@ export function BusinessProfileContent({ business, posts, headerAction, moreActi
       }
       renderItem={({ item }) => (
         <Pressable style={styles.tile} onPress={() => navigation.navigate('PostDetail', { postId: item.id })}>
-          <PostMedia uri={item.mediaUrl} mediaType={item.mediaType} thumbnailUri={item.thumbnailUrl} active={false} />
+          <PostMedia
+            uri={item.mediaUrl}
+            mediaType={item.mediaType}
+            thumbnailUri={item.thumbnailUrl}
+            active={false}
+            style={styles.tileMediaFallback}
+          />
         </Pressable>
       )}
       ListEmptyComponent={tab === 'posts' ? <Text style={styles.emptyGrid}>No posts yet.</Text> : null}
@@ -119,38 +135,55 @@ export function BusinessProfileContent({ business, posts, headerAction, moreActi
 }
 
 const styles = StyleSheet.create({
-  gridContent: { paddingBottom: 100 },
-  gridRow: { gap: 6, paddingHorizontal: 20 },
-  cover: { height: 130, backgroundColor: colors.paper2 },
+  gridContent: { paddingBottom: 100, gap: 3 },
+  gridRow: { gap: 3, paddingHorizontal: 3 },
+  cover: { height: 130, backgroundColor: colors.surfaceMuted2 },
   coverImage: { width: '100%', height: '100%' },
-  coverPlaceholder: { width: '100%', height: '100%', backgroundColor: colors.avatarPlaceholder },
-  moreWrap: { position: 'absolute', top: 58, right: 16 },
+  moreWrap: { position: 'absolute', top: 56, right: 14 },
   body: { paddingHorizontal: 20 },
   avatarRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: -34 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
-  name: { fontFamily: fonts.display.bold, fontSize: 19, color: colors.ink },
-  handle: { fontSize: 13, color: colors.inkSoft, marginTop: 2, fontFamily: fonts.body.regular },
-  bio: { fontSize: 14, color: colors.bodyText, lineHeight: 21, marginTop: 10, fontFamily: fonts.body.regular },
-  statsRow: { flexDirection: 'row', gap: 22, marginTop: 14 },
-  statText: { fontSize: 13, color: colors.inkSoft2, fontFamily: fonts.body.regular },
-  statNum: { fontWeight: '700', fontSize: 15, color: colors.ink, fontFamily: fonts.body.bold },
+  avatarRing: { width: 82, height: 82, borderRadius: 41, alignItems: 'center', justifyContent: 'center' },
+  avatarInnerBorder: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14 },
+  name: { fontFamily: fonts.display.bold, fontSize: 20, letterSpacing: -0.3, color: colors.ink },
+  handle: { fontSize: 13, color: colors.inkSoft, marginTop: 3, fontFamily: fonts.body.regular },
+  bio: { fontSize: 14, color: colors.captionText, lineHeight: 21.7, marginTop: 11, fontFamily: fonts.body.regular },
+  statsRow: { flexDirection: 'row', gap: 24, marginTop: 16 },
+  statText: { fontSize: 13, color: colors.inkFaint, fontFamily: fonts.body.regular },
+  statNum: { fontWeight: '700', fontSize: 15, color: colors.ink, fontFamily: fonts.display.bold },
   analyticsButton: {
-    marginTop: 14,
-    height: 44,
-    borderRadius: radius.sm + 2,
-    backgroundColor: colors.paper2,
+    marginTop: 16,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceMuted,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 9,
   },
-  analyticsButtonText: { fontWeight: '700', fontSize: 13, color: colors.bodyText, fontFamily: fonts.body.bold },
-  tabsRow: { flexDirection: 'row', gap: 24, marginTop: 20, borderBottomWidth: 1, borderBottomColor: colors.line },
-  tabLabel: { paddingBottom: 10, fontWeight: '600', fontSize: 13, color: colors.inkSoft2, fontFamily: fonts.body.semiBold },
-  tabLabelActive: { color: colors.ink, fontFamily: fonts.body.bold, borderBottomWidth: 2, borderBottomColor: colors.gold },
+  analyticsButtonText: { fontWeight: '700', fontSize: 13.5, color: colors.ink, fontFamily: fonts.body.bold },
+  tabsRow: { flexDirection: 'row', gap: 26, marginTop: 22, borderBottomWidth: 1, borderBottomColor: colors.hairline },
+  tabLabel: {
+    paddingBottom: 11,
+    fontWeight: '600',
+    fontSize: 13,
+    color: colors.inkFaint,
+    fontFamily: fonts.body.semiBold,
+    borderBottomWidth: 2.5,
+    borderBottomColor: 'transparent',
+  },
+  tabLabelActive: { color: colors.ink, fontFamily: fonts.body.bold, borderBottomColor: colors.gold },
   aboutWrap: { paddingVertical: 16 },
   aboutLabel: { fontSize: 12, fontWeight: '700', color: colors.inkSoft, textTransform: 'uppercase', letterSpacing: 0.4, fontFamily: fonts.body.bold },
-  aboutValue: { fontSize: 14, color: colors.bodyText, marginTop: 4, lineHeight: 20, fontFamily: fonts.body.regular },
-  tile: { flex: 1, aspectRatio: 9 / 13, borderRadius: 10, overflow: 'hidden', marginBottom: 6 },
-  emptyGrid: { textAlign: 'center', color: colors.inkSoft2, marginTop: 24, fontFamily: fonts.body.medium },
+  aboutValue: { fontSize: 14, color: colors.captionText, marginTop: 4, lineHeight: 20, fontFamily: fonts.body.regular },
+  tile: { flex: 1, aspectRatio: 0.75, overflow: 'hidden', backgroundColor: colors.surfaceMuted2 },
+  tileMediaFallback: { backgroundColor: colors.surfaceMuted2 },
+  emptyGrid: { textAlign: 'center', color: colors.inkFaint, marginTop: 24, fontFamily: fonts.body.medium },
 });

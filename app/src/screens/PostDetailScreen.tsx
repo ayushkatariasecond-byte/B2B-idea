@@ -11,11 +11,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PostMedia } from '../components/PostMedia';
 import { Avatar } from '../components/Avatar';
 import { Icon } from '../components/Icon';
-import { colors, fonts } from '../theme/tokens';
+import { colors, fonts, radius } from '../theme/tokens';
 import { RootStackParamList } from '../navigation/types';
 import { Comment, Post } from '../api/types';
 import * as postsApi from '../api/posts';
@@ -24,6 +25,21 @@ import { useRequireLogin } from '../hooks/useRequireLogin';
 import { promptReport } from '../utils/reportPrompt';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PostDetail'>;
+
+function CommentAvatar({ uri, name }: { uri?: string | null; name: string }) {
+  return (
+    <LinearGradient
+      colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.avatarRing}
+    >
+      <View style={styles.avatarRingInner}>
+        <Avatar uri={uri} name={name} size={27} />
+      </View>
+    </LinearGradient>
+  );
+}
 
 export function PostDetailScreen({ route, navigation }: Props) {
   const { postId } = route.params;
@@ -123,7 +139,12 @@ export function PostDetailScreen({ route, navigation }: Props) {
     <View style={styles.container}>
       <View style={styles.mediaWrap}>
         <PostMedia uri={post.mediaUrl} mediaType={post.mediaType} />
-        <View style={[StyleSheet.absoluteFill, styles.mediaScrim]} pointerEvents="none" />
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.6)']}
+          locations={[0.55, 1]}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
         <SafeAreaView style={styles.topBarWrap} edges={['top']}>
           <View style={styles.topBar}>
             <Pressable style={styles.backButton} onPress={() => navigation.goBack()} hitSlop={10} accessibilityLabel="Go back" accessibilityRole="button">
@@ -170,7 +191,7 @@ export function PostDetailScreen({ route, navigation }: Props) {
             <Text style={styles.statLabel}>Shares</Text>
           </View>
           <View style={styles.stat}>
-            <Text style={[styles.statValue, { color: colors.goldDeep }]}>{post.score}</Text>
+            <Text style={[styles.statValue, { color: colors.gradientGoldEnd }]}>{post.score}</Text>
             <Text style={styles.statLabel}>Score</Text>
           </View>
         </View>
@@ -183,7 +204,7 @@ export function PostDetailScreen({ route, navigation }: Props) {
             const canDelete = me && (me.id === item.business.id || me.id === post.businessId);
             return (
               <View style={styles.commentRow}>
-                <Avatar uri={item.business.avatarUrl} name={item.business.name} size={32} />
+                <CommentAvatar uri={item.business.avatarUrl} name={item.business.name} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.commentWho}>{item.business.name}</Text>
                   <Text style={styles.commentText}>{item.text}</Text>
@@ -203,13 +224,20 @@ export function PostDetailScreen({ route, navigation }: Props) {
           <TextInput
             style={styles.commentInput}
             placeholder="Add a comment..."
-            placeholderTextColor={colors.inkSoft2}
+            placeholderTextColor={colors.inkMuted}
             value={commentText}
             onChangeText={setCommentText}
             onSubmitEditing={sendComment}
           />
-          <Pressable style={styles.sendButton} onPress={sendComment} disabled={sending} hitSlop={8} accessibilityLabel="Send comment" accessibilityRole="button">
-            <Icon name="send" color={colors.white} size={16} />
+          <Pressable onPress={sendComment} disabled={sending} hitSlop={8} accessibilityLabel="Send comment" accessibilityRole="button">
+            <LinearGradient
+              colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.sendButton}
+            >
+              <Icon name="send" color={colors.white} size={16} />
+            </LinearGradient>
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -222,39 +250,59 @@ const styles = StyleSheet.create({
   errorText: { color: colors.white, textAlign: 'center', fontFamily: fonts.body.medium, fontSize: 15 },
   retryText: { color: colors.gold, textAlign: 'center', fontFamily: fonts.body.bold, fontSize: 14 },
   container: { flex: 1, backgroundColor: colors.dark },
-  mediaWrap: { height: '56%', flexShrink: 0 },
-  mediaScrim: { backgroundColor: 'rgba(0,0,0,0.35)' },
+  mediaWrap: { height: '56%', flexShrink: 0, backgroundColor: colors.dark },
   topBarWrap: { position: 'absolute', top: 0, left: 0, right: 0 },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginTop: 8 },
   topBarActions: { flexDirection: 'row', gap: 10 },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   mediaCaption: { position: 'absolute', left: 16, right: 16, bottom: 14 },
   handleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  handle: { color: colors.white, fontFamily: fonts.display.bold, fontSize: 15 },
-  caption: { color: colors.white, fontSize: 13, lineHeight: 18, marginTop: 4, fontFamily: fonts.body.regular },
-  sheet: { flex: 1, backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, marginTop: -18, overflow: 'hidden' },
+  handle: { color: colors.white, fontFamily: fonts.display.bold, fontSize: 16 },
+  caption: { color: 'rgba(255,255,255,0.92)', fontSize: 13, lineHeight: 19, marginTop: 4, fontFamily: fonts.body.regular },
+  sheet: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderTopLeftRadius: radius.sheet,
+    borderTopRightRadius: radius.sheet,
+    marginTop: -18,
+    overflow: 'hidden',
+  },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingVertical: 14,
+    paddingTop: 18,
+    paddingHorizontal: 18,
+    paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: colors.line2,
+    borderBottomColor: colors.hairline,
   },
   stat: { alignItems: 'center', gap: 2 },
-  statValue: { fontWeight: '700', fontSize: 14, color: colors.ink, fontFamily: fonts.body.bold },
-  statLabel: { fontSize: 11, color: colors.inkSoft2, fontFamily: fonts.body.medium },
+  statValue: { fontWeight: '700', fontSize: 15, color: colors.ink, fontFamily: fonts.display.bold },
+  statLabel: { fontSize: 11, color: colors.inkFaint, fontFamily: fonts.body.medium },
   commentList: { padding: 18, gap: 16, flexGrow: 1 },
-  commentRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  commentRow: { flexDirection: 'row', gap: 11, alignItems: 'flex-start' },
+  avatarRing: { width: 34, height: 34, borderRadius: 17, padding: 2, alignItems: 'center', justifyContent: 'center' },
+  avatarRingInner: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1.5,
+    borderColor: colors.white,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+  },
   commentWho: { fontSize: 13, fontWeight: '700', color: colors.ink, fontFamily: fonts.body.bold },
-  commentText: { fontSize: 13, color: colors.bodyText, lineHeight: 18, marginTop: 2, fontFamily: fonts.body.regular },
+  commentText: { fontSize: 13, color: colors.inkSoft, lineHeight: 19, marginTop: 2, fontFamily: fonts.body.regular },
   deleteText: { fontSize: 11, color: '#b3261e', fontFamily: fonts.body.semiBold },
   emptyComments: { color: colors.inkSoft2, textAlign: 'center', marginTop: 24, fontFamily: fonts.body.medium },
   inputBar: {
@@ -265,17 +313,28 @@ const styles = StyleSheet.create({
     gap: 10,
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: colors.line3,
+    borderTopColor: colors.hairline,
   },
   commentInput: {
     flex: 1,
-    height: 40,
-    borderRadius: 100,
-    backgroundColor: colors.paper2,
-    paddingHorizontal: 16,
+    height: 42,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceMuted2,
+    paddingHorizontal: 17,
     fontSize: 13,
     color: colors.ink,
     fontFamily: fonts.body.regular,
   },
-  sendButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center' },
+  sendButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.gradientGoldEnd,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.32,
+    shadowRadius: 14,
+    elevation: 4,
+  },
 });

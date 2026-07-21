@@ -5,7 +5,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Icon } from '../components/Icon';
-import { Chip } from '../components/Chip';
 import { Avatar } from '../components/Avatar';
 import { PostMedia } from '../components/PostMedia';
 import { BottomNav } from '../components/BottomNav';
@@ -16,6 +15,28 @@ import * as businessesApi from '../api/businesses';
 import { RootStackParamList } from '../navigation/types';
 
 const FILTERS = ['Trending', ...POST_TAGS];
+
+function FilterChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  if (active) {
+    return (
+      <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: true }}>
+        <LinearGradient
+          colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.chip}
+        >
+          <Text style={styles.chipTextActive}>{label}</Text>
+        </LinearGradient>
+      </Pressable>
+    );
+  }
+  return (
+    <Pressable onPress={onPress} style={[styles.chip, styles.chipInactive]} accessibilityRole="button" accessibilityState={{ selected: false }}>
+      <Text style={styles.chipTextInactive}>{label}</Text>
+    </Pressable>
+  );
+}
 
 export function DiscoverScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -69,11 +90,11 @@ export function DiscoverScreen() {
       <SafeAreaView style={styles.header} edges={['top']}>
         <Text style={styles.title}>Discover</Text>
         <View style={styles.searchBar}>
-          <Icon name="search" size={17} color={colors.inkSoft} />
+          <Icon name="search" size={17} color={colors.inkMuted} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search businesses, tags, #topics"
-            placeholderTextColor={colors.inkSoft2}
+            placeholderTextColor={colors.inkMuted}
             value={query}
             onChangeText={setQuery}
             accessibilityLabel="Search businesses, tags, or hashtags"
@@ -110,7 +131,9 @@ export function DiscoverScreen() {
             keyExtractor={(item) => item.tag}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.chipRow}
-            renderItem={({ item }) => <Chip label={`#${item.tag}`} onPress={() => setQuery(`#${item.tag}`)} />}
+            renderItem={({ item }) => (
+              <FilterChip label={`#${item.tag}`} active={false} onPress={() => setQuery(`#${item.tag}`)} />
+            )}
             ListHeaderComponent={<Text style={styles.trendingLabel}>Trending: </Text>}
           />
         )}
@@ -122,7 +145,7 @@ export function DiscoverScreen() {
             keyExtractor={(item) => item}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.chipRow}
-            renderItem={({ item }) => <Chip label={item} active={item === filter} onPress={() => setFilter(item)} />}
+            renderItem={({ item }) => <FilterChip label={item} active={item === filter} onPress={() => setFilter(item)} />}
           />
         )}
       </SafeAreaView>
@@ -139,13 +162,26 @@ export function DiscoverScreen() {
         <FlatList
           data={posts}
           keyExtractor={(item) => item.id}
-          numColumns={2}
+          numColumns={3}
           contentContainerStyle={styles.grid}
           columnWrapperStyle={styles.gridRow}
           renderItem={({ item }) => (
             <Pressable style={styles.tile} onPress={() => navigation.navigate('PostDetail', { postId: item.id })}>
-              <PostMedia uri={item.mediaUrl} mediaType={item.mediaType} thumbnailUri={item.thumbnailUrl} active={false} />
-              <View style={[StyleSheet.absoluteFill, styles.tileScrim]} pointerEvents="none" />
+              <PostMedia
+                uri={item.mediaUrl}
+                mediaType={item.mediaType}
+                thumbnailUri={item.thumbnailUrl}
+                active={false}
+                style={styles.tileMediaFallback}
+              />
+              <LinearGradient
+                colors={['rgba(0,0,0,0.6)', 'rgba(0,0,0,0)']}
+                locations={[0, 0.55]}
+                start={{ x: 0, y: 1 }}
+                end={{ x: 0, y: 0 }}
+                style={StyleSheet.absoluteFill}
+                pointerEvents="none"
+              />
               {item.trending && (
                 <LinearGradient
                   colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
@@ -153,6 +189,7 @@ export function DiscoverScreen() {
                   end={{ x: 1, y: 1 }}
                   style={styles.scoreBadge}
                 >
+                  <Icon name="lightning" color={colors.white} size={9} />
                   <Text style={styles.scoreBadgeText}>{item.score}</Text>
                 </LinearGradient>
               )}
@@ -161,7 +198,7 @@ export function DiscoverScreen() {
                   <Text style={styles.tileBiz} numberOfLines={1}>
                     {item.business.name}
                   </Text>
-                  {item.business.verified && <Icon name="checkBadge" color={colors.gold} size={12} />}
+                  {item.business.verified && <Icon name="checkBadge" color={colors.gold} size={11} />}
                 </View>
                 <Text style={styles.tileLikes}>{item.likeCount} likes</Text>
               </View>
@@ -177,47 +214,49 @@ export function DiscoverScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.white },
-  header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4, gap: 12 },
-  title: { fontFamily: fonts.display.bold, fontSize: 26, color: colors.ink },
+  header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, gap: 14 },
+  title: { fontFamily: fonts.display.bold, fontSize: 26, letterSpacing: -0.6, color: colors.ink },
   searchBar: {
-    height: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.paper2,
+    height: 42,
+    borderRadius: radius.xs,
+    backgroundColor: colors.surfaceMuted2,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 9,
     paddingHorizontal: 14,
   },
   searchInput: { flex: 1, fontSize: 14, color: colors.ink, fontFamily: fonts.body.regular },
-  autocompleteBox: { backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
+  autocompleteBox: { backgroundColor: colors.white, borderRadius: radius.smd, borderWidth: 1, borderColor: colors.hairline, overflow: 'hidden' },
   autocompleteRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10 },
   autocompleteNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   autocompleteText: { fontSize: 13, fontFamily: fonts.body.semiBold, color: colors.ink },
-  autocompleteHandle: { fontSize: 12, color: colors.inkSoft2, marginLeft: 'auto' },
-  trendingLabel: { fontSize: 12, color: colors.inkSoft, fontFamily: fonts.body.semiBold, alignSelf: 'center', marginRight: 4 },
+  autocompleteHandle: { fontSize: 12, color: colors.inkFaint, marginLeft: 'auto' },
+  trendingLabel: { fontSize: 12, color: colors.inkMuted, fontFamily: fonts.body.semiBold, alignSelf: 'center', marginRight: 4 },
   chipRow: { gap: 8, alignItems: 'center' },
+  chip: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: radius.pill },
+  chipInactive: { backgroundColor: colors.surfaceMuted2 },
+  chipTextActive: { fontSize: 13, fontFamily: fonts.body.bold, color: colors.white },
+  chipTextInactive: { fontSize: 13, fontFamily: fonts.body.semiBold, color: colors.inkSoft },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: colors.inkSoft, fontFamily: fonts.body.medium },
-  grid: { paddingHorizontal: 12, paddingTop: 4, paddingBottom: 100, gap: 8 },
-  gridRow: { gap: 8 },
-  tile: { flex: 1, aspectRatio: 9 / 13, borderRadius: radius.md, overflow: 'hidden' },
-  tileScrim: { backgroundColor: 'rgba(0,0,0,0.28)' },
+  grid: { paddingTop: 4, paddingHorizontal: 3, paddingBottom: 100, gap: 3 },
+  gridRow: { gap: 3 },
+  tile: { flex: 1, aspectRatio: 0.75, overflow: 'hidden', backgroundColor: colors.surfaceMuted2 },
+  tileMediaFallback: { backgroundColor: colors.surfaceMuted2 },
   scoreBadge: {
     position: 'absolute',
     top: 8,
-    left: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
     paddingVertical: 3,
     paddingHorizontal: 7,
-    borderRadius: 100,
-    shadowColor: colors.splashGlow2,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 2,
+    borderRadius: radius.pill,
   },
   scoreBadgeText: { color: colors.white, fontSize: 10, fontFamily: fonts.display.bold },
   tileCaption: { position: 'absolute', bottom: 8, left: 8, right: 8 },
   tileNameRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   tileBiz: { color: colors.white, fontSize: 12, fontFamily: fonts.display.bold },
-  tileLikes: { color: 'rgba(255,255,255,0.8)', fontSize: 10, marginTop: 1, fontFamily: fonts.body.medium },
+  tileLikes: { color: 'rgba(255,255,255,0.82)', fontSize: 10, marginTop: 1, fontFamily: fonts.body.medium },
 });

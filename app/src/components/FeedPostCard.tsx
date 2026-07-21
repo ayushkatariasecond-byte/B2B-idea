@@ -19,6 +19,13 @@ interface FeedPostCardProps {
   onShare: (post: Post) => void;
 }
 
+// Header avatar: 36px overall, 2px gold-gradient ring, 1.5px white inner border, avatar fill inside.
+const AVATAR_OUTER = 36;
+const AVATAR_RING = 2;
+const AVATAR_BORDER = 1.5;
+const AVATAR_INNER = AVATAR_OUTER - AVATAR_RING * 2;
+const AVATAR_SIZE = AVATAR_INNER - AVATAR_BORDER * 2;
+
 function formatRelativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const minutes = Math.floor(diffMs / 60000);
@@ -50,7 +57,16 @@ export function FeedPostCard({ post, isActive, onToggleLike, onToggleSave, onSha
     <View style={styles.card}>
       <View style={styles.header}>
         <Pressable style={styles.headerMain} onPress={goToProfile} accessibilityRole="button" accessibilityLabel={`View ${post.business.name}'s profile`}>
-          <Avatar uri={post.business.avatarUrl} name={post.business.name} size={36} />
+          <LinearGradient
+            colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.avatarRing}
+          >
+            <View style={styles.avatarBorder}>
+              <Avatar uri={post.business.avatarUrl} name={post.business.name} size={AVATAR_SIZE} />
+            </View>
+          </LinearGradient>
           <View style={styles.headerText}>
             <View style={styles.nameRow}>
               <Text style={styles.name} numberOfLines={1}>
@@ -70,65 +86,72 @@ export function FeedPostCard({ post, isActive, onToggleLike, onToggleSave, onSha
           accessibilityRole="button"
           accessibilityLabel="More options"
         >
-          <Icon name="moreDots" color={colors.inkSoft2} size={18} />
+          <View style={styles.moreDotsRotate}>
+            <Icon name="moreDots" color={colors.inkMuted} size={17} />
+          </View>
         </Pressable>
       </View>
 
-      <View style={styles.mediaWrap}>
-        <PostMedia uri={post.mediaUrl} mediaType={post.mediaType} thumbnailUri={post.thumbnailUrl} active={isActive} />
-        {post.trending && (
-          <LinearGradient
-            colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.trendingPill}
-          >
-            <Text style={styles.trendingText}>TRENDING · {post.score}</Text>
-          </LinearGradient>
-        )}
+      <View style={styles.mediaOuter}>
+        <View style={styles.mediaAspect}>
+          <View style={styles.mediaFill}>
+            <PostMedia uri={post.mediaUrl} mediaType={post.mediaType} thumbnailUri={post.thumbnailUrl} active={isActive} />
+          </View>
+          {post.trending && (
+            <LinearGradient
+              colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.trendingPill}
+            >
+              <Icon name="lightning" color={colors.white} size={12} />
+              <Text style={styles.trendingText}>{post.score}</Text>
+            </LinearGradient>
+          )}
+        </View>
       </View>
 
       <View style={styles.actionRow}>
-        <View style={styles.actionGroup}>
-          <Pressable
-            style={styles.actionItem}
-            onPress={() => onToggleLike(post)}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel={post.likedByMe ? 'Unlike post' : 'Like post'}
-          >
-            <Icon name={post.likedByMe ? 'heartFilled' : 'heart'} color={post.likedByMe ? colors.gold : colors.ink} size={24} />
-            <Text style={styles.actionLabel}>{post.likeCount}</Text>
-          </Pressable>
-          <Pressable style={styles.actionItem} onPress={goToDetail} hitSlop={10} accessibilityRole="button" accessibilityLabel="View comments">
-            <Icon name="comment" color={colors.ink} size={22} />
-            <Text style={styles.actionLabel}>{post.commentCount}</Text>
-          </Pressable>
-          <Pressable style={styles.actionItem} onPress={handleShare} hitSlop={10} accessibilityRole="button" accessibilityLabel="Share post">
-            <Icon name="send" color={colors.ink} size={21} />
-            <Text style={styles.actionLabel}>{post.shareCount}</Text>
-          </Pressable>
-        </View>
+        <Pressable
+          onPress={() => onToggleLike(post)}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={post.likedByMe ? 'Unlike post' : 'Like post'}
+        >
+          <Icon name={post.likedByMe ? 'heartFilled' : 'heart'} color={colors.ink} size={22} />
+        </Pressable>
+        <Pressable onPress={goToDetail} hitSlop={10} accessibilityRole="button" accessibilityLabel="View comments">
+          <Icon name="comment" color={colors.ink} size={22} strokeWidth={1.7} />
+        </Pressable>
+        <Pressable onPress={handleShare} hitSlop={10} accessibilityRole="button" accessibilityLabel="Share post">
+          <Icon name="send" color={colors.ink} size={21} />
+        </Pressable>
+        <View style={styles.actionSpacer} />
         <Pressable
           onPress={() => onToggleSave(post)}
           hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel={post.savedByMe ? 'Unsave post' : 'Save post'}
         >
-          <Icon name="star" color={post.savedByMe ? colors.gold : colors.inkFaint2} size={20} />
+          <Icon name={post.savedByMe ? 'bookmarkFilled' : 'bookmark'} color={colors.ink} size={22} />
         </Pressable>
       </View>
 
-      <View style={styles.captionWrap}>
+      <View style={styles.likesLine}>
+        <Text style={styles.likesText}>{post.likeCount} likes</Text>
+      </View>
+
+      <View style={styles.captionLine}>
         <Text style={styles.caption} numberOfLines={2}>
           <Text style={styles.captionHandle}>{'@' + post.business.handle}</Text> {post.caption}
         </Text>
-        {post.commentCount > 0 && (
-          <Pressable onPress={goToDetail} hitSlop={6}>
-            <Text style={styles.viewComments}>View all {post.commentCount} comments</Text>
-          </Pressable>
-        )}
       </View>
+
+      {post.commentCount > 0 && (
+        <Pressable style={styles.commentsLink} onPress={goToDetail} hitSlop={6}>
+          <Text style={styles.viewComments}>View all {post.commentCount} comments</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -136,48 +159,66 @@ export function FeedPostCard({ post, isActive, onToggleLike, onToggleSave, onSha
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.white,
-    borderRadius: radius.xl,
-    marginHorizontal: 12,
-    marginBottom: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.line,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.hairline,
   },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12 },
   headerMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
+  avatarRing: {
+    width: AVATAR_OUTER,
+    height: AVATAR_OUTER,
+    borderRadius: AVATAR_OUTER / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarBorder: {
+    width: AVATAR_INNER,
+    height: AVATAR_INNER,
+    borderRadius: AVATAR_INNER / 2,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerText: { flex: 1, minWidth: 0 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  name: { fontFamily: fonts.body.bold, fontSize: 14, color: colors.ink },
-  subtitle: { fontSize: 12, color: colors.inkFaint, marginTop: 1, fontFamily: fonts.body.regular },
+  name: { fontFamily: fonts.body.bold, fontSize: 13.5, color: colors.ink },
+  subtitle: { fontSize: 11.5, color: colors.inkFaint, marginTop: 1, fontFamily: fonts.body.regular },
   moreButton: { padding: 4 },
-  mediaWrap: { width: '100%', aspectRatio: 4 / 5, backgroundColor: colors.paper2 },
+  moreDotsRotate: { transform: [{ rotate: '90deg' }] },
+  mediaOuter: { marginHorizontal: 14, borderRadius: radius.md, overflow: 'hidden', backgroundColor: colors.paper2 },
+  mediaAspect: { width: '100%', paddingTop: '125%', position: 'relative' },
+  mediaFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   trendingPill: {
     position: 'absolute',
     top: 10,
     right: 10,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 11,
     borderRadius: radius.pill,
-    shadowColor: colors.splashGlow2,
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: colors.gradientGoldEnd,
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowRadius: 14,
+    elevation: 4,
   },
-  trendingText: { color: colors.white, fontFamily: fonts.display.bold, fontSize: 11 },
+  trendingText: { color: colors.white, fontFamily: fonts.display.bold, fontSize: 12 },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 4,
+    gap: 16,
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 6,
   },
-  actionGroup: { flexDirection: 'row', alignItems: 'center', gap: 18 },
-  actionItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  actionLabel: { fontSize: 13, color: colors.inkSoft, fontFamily: fonts.body.semiBold },
-  captionWrap: { paddingHorizontal: 12, paddingBottom: 14, paddingTop: 2, gap: 4 },
-  caption: { fontSize: 13.5, color: colors.bodyText, lineHeight: 19, fontFamily: fonts.body.regular },
+  actionSpacer: { flex: 1 },
+  likesLine: { paddingTop: 2, paddingHorizontal: 16, paddingBottom: 0 },
+  likesText: { fontSize: 13.5, fontFamily: fonts.body.bold, color: colors.ink },
+  captionLine: { paddingTop: 5, paddingHorizontal: 16, paddingBottom: 0 },
+  caption: { fontSize: 13.5, color: colors.captionText, lineHeight: 19.6, fontFamily: fonts.body.regular },
   captionHandle: { fontFamily: fonts.body.bold, color: colors.ink },
-  viewComments: { fontSize: 12.5, color: colors.inkFaint, fontFamily: fonts.body.medium },
+  commentsLink: { paddingTop: 6, paddingHorizontal: 16, paddingBottom: 15 },
+  viewComments: { fontSize: 13, color: colors.inkFaint, fontFamily: fonts.body.medium },
 });

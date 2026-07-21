@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEventListener } from 'expo';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
@@ -17,6 +18,14 @@ type Props = NativeStackScreenProps<RootStackParamList, 'StoryViewer'>;
 const IMAGE_DURATION_MS = 5000;
 const DEFAULT_VIDEO_DURATION_MS = 5000;
 const TICK_MS = 50;
+
+// Header avatar: 34px overall, 2px gold ring, inner border matches the dark full-bleed
+// background (not white, since this sits on a dark surface — see design spec).
+const AVATAR_OUTER = 34;
+const AVATAR_RING = 2;
+const AVATAR_BORDER = 1.5;
+const AVATAR_INNER = AVATAR_OUTER - AVATAR_RING * 2;
+const AVATAR_SIZE = AVATAR_INNER - AVATAR_BORDER * 2;
 
 function formatTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -56,6 +65,7 @@ export function StoryViewerScreen({ route, navigation }: Props) {
   const [paused, setPaused] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [videoDurationMs, setVideoDurationMs] = useState(DEFAULT_VIDEO_DURATION_MS);
+  const [likedStoryIds, setLikedStoryIds] = useState<Set<string>>(new Set());
   const viewedRef = useRef(new Set<string>());
   const leftHeld = useRef(false);
   const rightHeld = useRef(false);
@@ -119,7 +129,7 @@ export function StoryViewerScreen({ route, navigation }: Props) {
         <SafeAreaView style={styles.emptyWrap} edges={['top']}>
           <Pressable onPress={() => navigation.goBack()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
             <View style={{ transform: [{ rotate: '45deg' }] }}>
-              <Icon name="plus" color={colors.white} size={22} />
+              <Icon name="plus" color={colors.white} size={22} strokeWidth={2} />
             </View>
           </Pressable>
         </SafeAreaView>
@@ -128,6 +138,24 @@ export function StoryViewerScreen({ route, navigation }: Props) {
   }
 
   const resolvedUri = resolveMediaUrl(story.mediaUrl);
+  const isLiked = likedStoryIds.has(story.id);
+
+  const toggleLike = () => {
+    setLikedStoryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(story.id)) next.delete(story.id);
+      else next.add(story.id);
+      return next;
+    });
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({ message: `${group.business.name}'s story on Verve` });
+    } catch {
+      // user dismissed share sheet; nothing to do
+    }
+  };
 
   const leftZoneProps = {
     delayLongPress: 220,
@@ -188,45 +216,97 @@ export function StoryViewerScreen({ route, navigation }: Props) {
         <Pressable style={styles.rightZone} accessibilityRole="button" accessibilityLabel="Next story" {...rightZoneProps} />
       </View>
 
-      <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
-        <View style={styles.progressRow} pointerEvents="none">
-          {group.stories.map((s, i) => (
-            <View key={s.id} style={styles.progressTrack}>
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: i < storyIndex ? '100%' : i === storyIndex ? `${Math.min(100, (elapsed / durationMs) * 100)}%` : '0%' },
-                ]}
-              />
-            </View>
-          ))}
-        </View>
+      <LinearGradient
+        colors={['rgba(0,0,0,0.55)', 'transparent']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.topScrim}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.8)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.bottomScrim}
+        pointerEvents="none"
+      />
 
-        <View style={styles.headerRow}>
-          <Pressable
-            style={styles.headerInfo}
-            onPress={() => navigation.navigate('BusinessProfile', { businessId: group.business.id })}
-            accessibilityRole="button"
-            accessibilityLabel={`View ${group.business.name}'s profile`}
+      <View style={styles.progressRow} pointerEvents="none">
+        {group.stories.map((s, i) => (
+          <View key={s.id} style={styles.progressTrack}>
+            <View
+              style={[
+                styles.progressFill,
+                { width: i < storyIndex ? '100%' : i === storyIndex ? `${Math.min(100, (elapsed / durationMs) * 100)}%` : '0%' },
+              ]}
+            />
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.headerRow}>
+        <Pressable
+          style={styles.headerInfo}
+          onPress={() => navigation.navigate('BusinessProfile', { businessId: group.business.id })}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${group.business.name}'s profile`}
+        >
+          <LinearGradient
+            colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.avatarRing}
           >
-            <Avatar uri={group.business.avatarUrl} name={group.business.name} size={32} borderColor={colors.white} borderWidth={1} />
-            <View style={styles.headerText}>
-              <View style={styles.headerNameRow}>
-                <Text style={styles.headerName} numberOfLines={1}>
-                  {group.business.name}
-                </Text>
-                {group.business.verified && <Icon name="checkBadge" color={colors.gold} size={13} />}
-              </View>
-              <Text style={styles.headerTime}>{formatTime(story.createdAt)}</Text>
+            <View style={styles.avatarBorder}>
+              <Avatar uri={group.business.avatarUrl} name={group.business.name} size={AVATAR_SIZE} />
             </View>
-          </Pressable>
-          <Pressable style={styles.closeButton} onPress={() => navigation.goBack()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
-            <View style={{ transform: [{ rotate: '45deg' }] }}>
-              <Icon name="plus" color={colors.white} size={20} />
+          </LinearGradient>
+          <View style={styles.headerText}>
+            <View style={styles.headerNameRow}>
+              <Text style={styles.headerName} numberOfLines={1}>
+                {group.business.name}
+              </Text>
+              {group.business.verified && <Icon name="checkBadge" color={colors.gold} size={13} />}
             </View>
+            <Text style={styles.headerTime}>{formatTime(story.createdAt)}</Text>
+          </View>
+        </Pressable>
+        <Pressable style={styles.closeButton} onPress={() => navigation.goBack()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
+          <View style={{ transform: [{ rotate: '45deg' }] }}>
+            <Icon name="plus" color={colors.white} size={16} strokeWidth={2} />
+          </View>
+        </Pressable>
+      </View>
+
+      <View style={styles.actionRail}>
+        <View style={styles.railItem}>
+          <Pressable
+            style={styles.railCircle}
+            onPress={toggleLike}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={isLiked ? 'Unlike story' : 'Like story'}
+          >
+            <Icon name={isLiked ? 'heartFilled' : 'heart'} color={colors.white} size={22} />
           </Pressable>
         </View>
-      </SafeAreaView>
+        <View style={styles.railItem}>
+          <Pressable style={styles.railCircle} hitSlop={8} accessibilityRole="button" accessibilityLabel="Comment">
+            <Icon name="comment" color={colors.white} size={21} strokeWidth={1.8} />
+          </Pressable>
+        </View>
+        <View style={styles.railItem}>
+          <Pressable style={styles.railCircle} onPress={handleShare} hitSlop={8} accessibilityRole="button" accessibilityLabel="Share story">
+            <Icon name="send" color={colors.white} size={20} />
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.bottomOverlay} pointerEvents="none">
+        <Text style={styles.handle} numberOfLines={1}>
+          {'@' + group.business.handle}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -239,21 +319,69 @@ const styles = StyleSheet.create({
   mediaPlaceholder: { backgroundColor: colors.dark },
   leftZone: { position: 'absolute', top: 0, bottom: 0, left: 0, width: '35%' },
   rightZone: { position: 'absolute', top: 0, bottom: 0, right: 0, width: '65%' },
-  topOverlay: { position: 'absolute', top: 0, left: 0, right: 0 },
-  progressRow: { flexDirection: 'row', gap: 4, paddingHorizontal: 10, paddingTop: 8 },
-  progressTrack: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.35)', overflow: 'hidden' },
+  topScrim: { position: 'absolute', top: 0, left: 0, right: 0, height: 200 },
+  bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 340 },
+  progressRow: {
+    position: 'absolute',
+    top: 52,
+    left: 14,
+    right: 14,
+    flexDirection: 'row',
+    gap: 5,
+  },
+  progressTrack: { flex: 1, height: 2.5, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.35)', overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: colors.white, borderRadius: 2 },
   headerRow: {
+    position: 'absolute',
+    top: 66,
+    left: 14,
+    right: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingTop: 10,
   },
   headerInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginRight: 12 },
+  avatarRing: {
+    width: AVATAR_OUTER,
+    height: AVATAR_OUTER,
+    borderRadius: AVATAR_OUTER / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarBorder: {
+    width: AVATAR_INNER,
+    height: AVATAR_INNER,
+    borderRadius: AVATAR_INNER / 2,
+    backgroundColor: colors.dark,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerText: { flex: 1 },
   headerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   headerName: { color: colors.white, fontFamily: fonts.display.bold, fontSize: 14 },
-  headerTime: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontFamily: fonts.body.medium, marginTop: 1 },
+  headerTime: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontFamily: fonts.body.medium, marginTop: 1 },
   closeButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  actionRail: {
+    position: 'absolute',
+    right: 14,
+    bottom: 116,
+    alignItems: 'center',
+    gap: 22,
+  },
+  railItem: { alignItems: 'center', gap: 5 },
+  railCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bottomOverlay: {
+    position: 'absolute',
+    left: 18,
+    right: 82,
+    bottom: 40,
+  },
+  handle: { fontFamily: fonts.display.bold, fontSize: 16, color: colors.white },
 });

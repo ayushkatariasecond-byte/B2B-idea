@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BusinessProfileContent } from '../components/BusinessProfileContent';
 import { Icon } from '../components/Icon';
@@ -117,15 +118,19 @@ export function BusinessProfileScreen({ route, navigation }: Props) {
               <Icon name="comment" color={colors.ink} size={17} />
             </Pressable>
             <Pressable
-              style={[styles.followButton, business.isFollowedByMe && styles.followingButton]}
               onPress={toggleFollow}
               disabled={followBusy}
               accessibilityRole="button"
               accessibilityLabel={business.isFollowedByMe ? 'Unfollow' : 'Follow'}
             >
-              <Text style={[styles.followButtonText, business.isFollowedByMe && styles.followingButtonText]}>
-                {business.isFollowedByMe ? 'Following' : 'Follow'}
-              </Text>
+              <LinearGradient
+                colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.followButton}
+              >
+                <Text style={styles.followButtonText}>{business.isFollowedByMe ? 'Following' : 'Follow'}</Text>
+              </LinearGradient>
             </Pressable>
           </View>
         }
@@ -156,15 +161,15 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   moreButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -173,12 +178,10 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: colors.paper2,
+    backgroundColor: colors.surfaceMuted2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  followButton: { backgroundColor: colors.gold, paddingHorizontal: 18, paddingVertical: 9, borderRadius: radius.pill },
-  followingButton: { backgroundColor: colors.paper2 },
+  followButton: { paddingHorizontal: 22, paddingVertical: 10, borderRadius: radius.pill },
   followButtonText: { fontWeight: '700', fontSize: 13, color: colors.white, fontFamily: fonts.body.bold },
-  followingButtonText: { color: colors.ink },
 });

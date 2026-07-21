@@ -13,9 +13,11 @@ import * as storiesApi from '../api/stories';
 import { useAuth } from '../context/AuthContext';
 import { alert } from '../utils/alert';
 
-const RING_SIZE = 64;
-const RING_GAP = 3;
-const AVATAR_SIZE = RING_SIZE - RING_GAP * 4;
+const RING_SIZE = 60;
+const RING_THICKNESS = 2.5;
+const WHITE_BORDER = 2;
+const RING_GAP_SIZE = RING_SIZE - RING_THICKNESS * 2;
+const AVATAR_SIZE = RING_GAP_SIZE - WHITE_BORDER * 2;
 
 function isVideoAsset(asset: ImagePicker.ImagePickerAsset): boolean {
   return asset.type === 'video' || /\.(mp4|mov|m4v|webm)$/i.test(asset.uri);
@@ -75,6 +77,7 @@ export function StoryTray() {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={styles.scroll}
       contentContainerStyle={styles.container}
       accessibilityLabel="Stories"
     >
@@ -143,8 +146,14 @@ export function StoryTray() {
 }
 
 const styles = StyleSheet.create({
-  container: { paddingHorizontal: 14, paddingVertical: 12, gap: 14, alignItems: 'flex-start' },
-  item: { width: 72, alignItems: 'center', gap: 6 },
+  scroll: { borderBottomWidth: 1, borderBottomColor: colors.hairline },
+  container: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 16,
+    alignItems: 'flex-start',
+  },
+  item: { width: 66, alignItems: 'center', gap: 6 },
   ring: {
     width: RING_SIZE,
     height: RING_SIZE,
@@ -153,14 +162,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   ringGap: {
-    width: RING_SIZE - RING_GAP * 2,
-    height: RING_SIZE - RING_GAP * 2,
-    borderRadius: (RING_SIZE - RING_GAP * 2) / 2,
+    width: RING_GAP_SIZE,
+    height: RING_GAP_SIZE,
+    borderRadius: RING_GAP_SIZE / 2,
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  seenRing: { backgroundColor: colors.barNeutral },
+  seenRing: { backgroundColor: colors.threadReadRing },
   addRing: { backgroundColor: colors.paper2, borderWidth: 1, borderColor: colors.line },
   plusBadge: {
     position: 'absolute',
@@ -175,6 +184,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 2, maxWidth: 72 },
-  label: { fontSize: 11, color: colors.inkSoft2, fontFamily: fonts.body.medium, maxWidth: 68 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 2, maxWidth: 62 },
+  label: { fontSize: 11, color: colors.inkSoft, fontFamily: fonts.body.medium, maxWidth: 62 },
 });
