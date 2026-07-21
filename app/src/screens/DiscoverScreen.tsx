@@ -93,7 +93,10 @@ export function DiscoverScreen() {
                 }}
               >
                 <Avatar uri={b.avatarUrl} name={b.name} size={28} />
-                <Text style={styles.autocompleteText}>{b.name}</Text>
+                <View style={styles.autocompleteNameRow}>
+                  <Text style={styles.autocompleteText}>{b.name}</Text>
+                  {b.verified && <Icon name="checkBadge" color={colors.gold} size={13} />}
+                </View>
                 <Text style={styles.autocompleteHandle}>@{b.handle}</Text>
               </Pressable>
             ))}
@@ -154,9 +157,12 @@ export function DiscoverScreen() {
                 </LinearGradient>
               )}
               <View style={styles.tileCaption}>
-                <Text style={styles.tileBiz} numberOfLines={1}>
-                  {item.business.name}
-                </Text>
+                <View style={styles.tileNameRow}>
+                  <Text style={styles.tileBiz} numberOfLines={1}>
+                    {item.business.name}
+                  </Text>
+                  {item.business.verified && <Icon name="checkBadge" color={colors.gold} size={12} />}
+                </View>
                 <Text style={styles.tileLikes}>{item.likeCount} likes</Text>
               </View>
             </Pressable>
@@ -185,6 +191,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 14, color: colors.ink, fontFamily: fonts.body.regular },
   autocompleteBox: { backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
   autocompleteRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10 },
+  autocompleteNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   autocompleteText: { fontSize: 13, fontFamily: fonts.body.semiBold, color: colors.ink },
   autocompleteHandle: { fontSize: 12, color: colors.inkSoft2, marginLeft: 'auto' },
   trendingLabel: { fontSize: 12, color: colors.inkSoft, fontFamily: fonts.body.semiBold, alignSelf: 'center', marginRight: 4 },
@@ -210,6 +217,7 @@ const styles = StyleSheet.create({
   },
   scoreBadgeText: { color: colors.white, fontSize: 10, fontFamily: fonts.display.bold },
   tileCaption: { position: 'absolute', bottom: 8, left: 8, right: 8 },
+  tileNameRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   tileBiz: { color: colors.white, fontSize: 12, fontFamily: fonts.display.bold },
   tileLikes: { color: 'rgba(255,255,255,0.8)', fontSize: 10, marginTop: 1, fontFamily: fonts.body.medium },
 });

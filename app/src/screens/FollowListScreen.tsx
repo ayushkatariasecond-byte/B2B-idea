@@ -109,7 +109,10 @@ export function FollowListScreen({ route, navigation }: Props) {
               >
                 <Avatar uri={item.avatarUrl} name={item.name} size={44} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.name}>{item.name}</Text>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.name}>{item.name}</Text>
+                    {item.verified && <Icon name="checkBadge" color={colors.gold} size={13} />}
+                  </View>
                   <Text style={styles.category}>@{item.handle}</Text>
                 </View>
                 {!item.isMe && (
@@ -147,6 +150,7 @@ const styles = StyleSheet.create({
   empty: { textAlign: 'center', color: colors.inkSoft2, marginTop: 40, fontFamily: fonts.body.medium, fontSize: 14 },
   list: { padding: 20, gap: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   name: { fontSize: 14, fontFamily: fonts.body.bold, color: colors.ink },
   category: { fontSize: 12, color: colors.inkSoft2, marginTop: 2 },
   followButton: { backgroundColor: colors.gold, paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.pill },

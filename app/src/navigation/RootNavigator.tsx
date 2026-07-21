@@ -28,6 +28,7 @@ import { DraftsScreen } from '../screens/DraftsScreen';
 import { TeamMembersScreen } from '../screens/TeamMembersScreen';
 import { SavedPostsScreen } from '../screens/SavedPostsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { StoryViewerScreen } from '../screens/StoryViewerScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -94,6 +95,7 @@ export function RootNavigator() {
         <Stack.Screen name="Tabs" component={TabsGate} />
         <Stack.Screen name="SuggestedFollows" component={SuggestedFollowsScreen} />
         <Stack.Screen name="Compose" component={ComposeScreen} options={{ presentation: 'modal' }} />
+        <Stack.Screen name="StoryViewer" component={StoryViewerScreen} options={{ presentation: 'modal' }} />
         <Stack.Screen name="PostDetail" component={PostDetailScreen} />
         <Stack.Screen name="BusinessProfile" component={BusinessProfileScreen} />
         <Stack.Screen name="FollowList" component={FollowListScreen} />

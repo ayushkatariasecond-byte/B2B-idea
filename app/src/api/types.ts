@@ -97,4 +97,28 @@ export interface TrendingTag {
   count: number;
 }
 
+export interface StoryItem {
+  id: string;
+  mediaUrl: string;
+  mediaType: 'image' | 'video';
+  createdAt: string;
+  viewedByMe: boolean;
+}
+
+export interface StoryGroup {
+  business: Business;
+  stories: StoryItem[];
+  hasUnseen: boolean;
+}
+
+export interface CreatedStory {
+  id: string;
+  businessId: string;
+  business: Business;
+  mediaUrl: string;
+  mediaType: 'image' | 'video';
+  createdAt: string;
+  expiresAt: string;
+}
+
 export const POST_TAGS = ['Product Launch', 'Culture', 'Case Study', 'Behind the Build', 'Customer Story'];

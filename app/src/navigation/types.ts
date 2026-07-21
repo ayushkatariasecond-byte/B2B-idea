@@ -1,3 +1,5 @@
+import { StoryGroup } from '../api/types';
+
 export type RootStackParamList = {
   Onboarding: undefined;
   Signup: undefined;
@@ -19,6 +21,7 @@ export type RootStackParamList = {
   TeamMembers: undefined;
   Saved: undefined;
   Settings: undefined;
+  StoryViewer: { groups: StoryGroup[]; startIndex: number };
 };
 
 export type TabParamList = {

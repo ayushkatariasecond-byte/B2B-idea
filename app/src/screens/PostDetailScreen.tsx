@@ -146,7 +146,10 @@ export function PostDetailScreen({ route, navigation }: Props) {
           </View>
         </SafeAreaView>
         <View style={styles.mediaCaption}>
-          <Text style={styles.handle}>{'@' + post.business.handle}</Text>
+          <View style={styles.handleRow}>
+            <Text style={styles.handle}>{'@' + post.business.handle}</Text>
+            {post.business.verified && <Icon name="checkBadge" color={colors.gold} size={14} />}
+          </View>
           <Text style={styles.caption}>{post.caption}</Text>
         </View>
       </View>
@@ -233,6 +236,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   mediaCaption: { position: 'absolute', left: 16, right: 16, bottom: 14 },
+  handleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   handle: { color: colors.white, fontFamily: fonts.display.bold, fontSize: 15 },
   caption: { color: colors.white, fontSize: 13, lineHeight: 18, marginTop: 4, fontFamily: fonts.body.regular },
   sheet: { flex: 1, backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, marginTop: -18, overflow: 'hidden' },

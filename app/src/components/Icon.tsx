@@ -20,7 +20,8 @@ export type IconName =
   | 'volumeOn'
   | 'volumeOff'
   | 'play'
-  | 'arrowRight';
+  | 'arrowRight'
+  | 'bell';
 
 interface IconProps {
   name: IconName;
@@ -161,6 +162,20 @@ export function Icon({ name, size = 22, color = '#000000', strokeWidth = 1.8 }: 
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24">
           <Path d="M5 12h14M13 6l6 6-6 6" stroke={color} strokeWidth={2.4} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'bell':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path
+            d="M6 10a6 6 0 0 1 12 0v4l1.5 3h-15L6 14v-4Z"
+            fill="none"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          <Path d="M10 20a2 2 0 0 0 4 0" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
         </Svg>
       );
     default:

@@ -3,6 +3,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
+import { Icon } from '../components/Icon';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, fonts, radius } from '../theme/tokens';
 import { RootStackParamList } from '../navigation/types';
@@ -76,7 +77,10 @@ export function SuggestedFollowsScreen({ navigation }: Props) {
               <View style={styles.row}>
                 <Avatar uri={item.avatarUrl} name={item.name} size={44} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.name}>{item.name}</Text>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.name}>{item.name}</Text>
+                    {item.verified && <Icon name="checkBadge" color={colors.gold} size={13} />}
+                  </View>
                   <Text style={styles.category}>{item.category}</Text>
                 </View>
                 <Pressable
@@ -111,6 +115,7 @@ const styles = StyleSheet.create({
   retryText: { color: colors.gold, textAlign: 'center', fontFamily: fonts.body.bold, fontSize: 14 },
   list: { padding: 20, gap: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   name: { fontSize: 14, fontFamily: fonts.body.bold, color: colors.ink },
   category: { fontSize: 12, color: colors.inkSoft2, marginTop: 2 },
   followButton: { backgroundColor: colors.gold, paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.pill },

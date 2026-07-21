@@ -6,19 +6,32 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PostMedia } from './PostMedia';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
-import { colors, fonts } from '../theme/tokens';
+import { colors, fonts, radius } from '../theme/tokens';
 import { Post } from '../api/types';
 import { RootStackParamList } from '../navigation/types';
+import { promptReport } from '../utils/reportPrompt';
 
 interface FeedPostCardProps {
   post: Post;
-  height: number;
   isActive: boolean;
   onToggleLike: (post: Post) => void;
+  onToggleSave: (post: Post) => void;
   onShare: (post: Post) => void;
 }
 
-export function FeedPostCard({ post, height, isActive, onToggleLike, onShare }: FeedPostCardProps) {
+function formatRelativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'now';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d`;
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+export function FeedPostCard({ post, isActive, onToggleLike, onToggleSave, onShare }: FeedPostCardProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleShare = async () => {
@@ -30,54 +43,39 @@ export function FeedPostCard({ post, height, isActive, onToggleLike, onShare }: 
     }
   };
 
+  const goToProfile = () => navigation.navigate('BusinessProfile', { businessId: post.businessId });
+  const goToDetail = () => navigation.navigate('PostDetail', { postId: post.id });
+
   return (
-    <View style={{ height, width: '100%' }}>
-      <View style={StyleSheet.absoluteFill}>
+    <View style={styles.card}>
+      <View style={styles.header}>
+        <Pressable style={styles.headerMain} onPress={goToProfile} accessibilityRole="button" accessibilityLabel={`View ${post.business.name}'s profile`}>
+          <Avatar uri={post.business.avatarUrl} name={post.business.name} size={36} />
+          <View style={styles.headerText}>
+            <View style={styles.nameRow}>
+              <Text style={styles.name} numberOfLines={1}>
+                {post.business.name}
+              </Text>
+              {post.business.verified && <Icon name="checkBadge" color={colors.gold} size={13} />}
+            </View>
+            <Text style={styles.subtitle} numberOfLines={1}>
+              {post.tag} · {formatRelativeTime(post.createdAt)}
+            </Text>
+          </View>
+        </Pressable>
+        <Pressable
+          style={styles.moreButton}
+          onPress={() => promptReport('post', post.id)}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="More options"
+        >
+          <Icon name="moreDots" color={colors.inkSoft2} size={18} />
+        </Pressable>
+      </View>
+
+      <View style={styles.mediaWrap}>
         <PostMedia uri={post.mediaUrl} mediaType={post.mediaType} thumbnailUri={post.thumbnailUrl} active={isActive} />
-      </View>
-
-      <LinearGradient colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0)']} style={styles.topScrim} pointerEvents="none" />
-      <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.75)']} style={styles.bottomScrim} pointerEvents="none" />
-
-      <View style={styles.rail}>
-        <Pressable
-          style={styles.railItem}
-          onPress={() => onToggleLike(post)}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel={post.likedByMe ? 'Unlike post' : 'Like post'}
-        >
-          <Icon name={post.likedByMe ? 'heartFilled' : 'heart'} color={post.likedByMe ? colors.gold : colors.white} size={30} />
-          <Text style={styles.railLabel}>{post.likeCount}</Text>
-        </Pressable>
-        <Pressable
-          style={styles.railItem}
-          onPress={() => navigation.navigate('PostDetail', { postId: post.id })}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel="View comments"
-        >
-          <Icon name="comment" color={colors.white} size={28} />
-          <Text style={styles.railLabel}>{post.commentCount}</Text>
-        </Pressable>
-        <Pressable style={styles.railItem} onPress={handleShare} hitSlop={10} accessibilityRole="button" accessibilityLabel="Share post">
-          <Icon name="send" color={colors.white} size={27} />
-          <Text style={styles.railLabel}>{post.shareCount}</Text>
-        </Pressable>
-        <Pressable
-          style={styles.avatarButton}
-          onPress={() => navigation.navigate('BusinessProfile', { businessId: post.businessId })}
-          accessibilityRole="button"
-          accessibilityLabel={`View ${post.business.name}'s profile`}
-        >
-          <Avatar uri={post.business.avatarUrl} name={post.business.name} size={40} />
-        </Pressable>
-      </View>
-
-      <Pressable
-        style={styles.captionWrap}
-        onPress={() => navigation.navigate('BusinessProfile', { businessId: post.businessId })}
-      >
         {post.trending && (
           <LinearGradient
             colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
@@ -85,41 +83,101 @@ export function FeedPostCard({ post, height, isActive, onToggleLike, onShare }: 
             end={{ x: 1, y: 0 }}
             style={styles.trendingPill}
           >
-            <Text style={styles.trendingText}>TRENDING · {post.score} SCORE</Text>
+            <Text style={styles.trendingText}>TRENDING · {post.score}</Text>
           </LinearGradient>
         )}
-        <Text style={styles.handle}>{'@' + post.business.handle}</Text>
-        <Text style={styles.tag}>{post.tag}</Text>
-        <Text style={styles.caption} numberOfLines={3}>
-          {post.caption}
+      </View>
+
+      <View style={styles.actionRow}>
+        <View style={styles.actionGroup}>
+          <Pressable
+            style={styles.actionItem}
+            onPress={() => onToggleLike(post)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={post.likedByMe ? 'Unlike post' : 'Like post'}
+          >
+            <Icon name={post.likedByMe ? 'heartFilled' : 'heart'} color={post.likedByMe ? colors.gold : colors.ink} size={24} />
+            <Text style={styles.actionLabel}>{post.likeCount}</Text>
+          </Pressable>
+          <Pressable style={styles.actionItem} onPress={goToDetail} hitSlop={10} accessibilityRole="button" accessibilityLabel="View comments">
+            <Icon name="comment" color={colors.ink} size={22} />
+            <Text style={styles.actionLabel}>{post.commentCount}</Text>
+          </Pressable>
+          <Pressable style={styles.actionItem} onPress={handleShare} hitSlop={10} accessibilityRole="button" accessibilityLabel="Share post">
+            <Icon name="send" color={colors.ink} size={21} />
+            <Text style={styles.actionLabel}>{post.shareCount}</Text>
+          </Pressable>
+        </View>
+        <Pressable
+          onPress={() => onToggleSave(post)}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={post.savedByMe ? 'Unsave post' : 'Save post'}
+        >
+          <Icon name="star" color={post.savedByMe ? colors.gold : colors.inkFaint2} size={20} />
+        </Pressable>
+      </View>
+
+      <View style={styles.captionWrap}>
+        <Text style={styles.caption} numberOfLines={2}>
+          <Text style={styles.captionHandle}>{'@' + post.business.handle}</Text> {post.caption}
         </Text>
-      </Pressable>
+        {post.commentCount > 0 && (
+          <Pressable onPress={goToDetail} hitSlop={6}>
+            <Text style={styles.viewComments}>View all {post.commentCount} comments</Text>
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  topScrim: { position: 'absolute', top: 0, left: 0, right: 0, height: 220 },
-  bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 320 },
-  rail: { position: 'absolute', right: 12, bottom: 130, alignItems: 'center', gap: 22 },
-  railItem: { alignItems: 'center', gap: 4 },
-  railLabel: { color: colors.white, fontSize: 12, fontWeight: '700', fontFamily: fonts.body.bold },
-  avatarButton: { borderRadius: 20, overflow: 'hidden', borderWidth: 2, borderColor: colors.gold },
-  captionWrap: { position: 'absolute', left: 16, right: 90, bottom: 34 },
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: radius.xl,
+    marginHorizontal: 12,
+    marginBottom: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 },
+  headerMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
+  headerText: { flex: 1, minWidth: 0 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  name: { fontFamily: fonts.body.bold, fontSize: 14, color: colors.ink },
+  subtitle: { fontSize: 12, color: colors.inkFaint, marginTop: 1, fontFamily: fonts.body.regular },
+  moreButton: { padding: 4 },
+  mediaWrap: { width: '100%', aspectRatio: 4 / 5, backgroundColor: colors.paper2 },
   trendingPill: {
-    alignSelf: 'flex-start',
+    position: 'absolute',
+    top: 10,
+    right: 10,
     paddingVertical: 5,
     paddingHorizontal: 10,
-    borderRadius: 100,
+    borderRadius: radius.pill,
     shadowColor: colors.splashGlow2,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
     elevation: 3,
-    marginBottom: 8,
   },
   trendingText: { color: colors.white, fontFamily: fonts.display.bold, fontSize: 11 },
-  handle: { color: colors.white, fontFamily: fonts.display.bold, fontSize: 16 },
-  tag: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontFamily: fonts.body.medium, marginTop: 2 },
-  caption: { color: colors.white, fontSize: 14, lineHeight: 19.6, marginTop: 6, fontFamily: fonts.body.regular },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  actionGroup: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  actionItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  actionLabel: { fontSize: 13, color: colors.inkSoft, fontFamily: fonts.body.semiBold },
+  captionWrap: { paddingHorizontal: 12, paddingBottom: 14, paddingTop: 2, gap: 4 },
+  caption: { fontSize: 13.5, color: colors.bodyText, lineHeight: 19, fontFamily: fonts.body.regular },
+  captionHandle: { fontFamily: fonts.body.bold, color: colors.ink },
+  viewComments: { fontSize: 12.5, color: colors.inkFaint, fontFamily: fonts.body.medium },
 });
