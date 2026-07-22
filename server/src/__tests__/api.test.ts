@@ -1196,4 +1196,48 @@ describe('Verve API', () => {
     expect(readRes.status).toBe(200);
     expect(readRes.body.buyer.email).toBe('repeatbuyer@test.com');
   });
+
+  it('lists and filters the public agency directory by service, industry, and budget', async () => {
+    const adminLogin = await request(app).post('/auth/login').send({ email: 'admin@test.com', password: 'password123' });
+    const serviceRes = await request(app)
+      .post('/services')
+      .set('Authorization', `Bearer ${adminLogin.body.token}`)
+      .send({ name: 'Directory Test SEO' });
+    const industryRes = await request(app)
+      .post('/industries')
+      .set('Authorization', `Bearer ${adminLogin.body.token}`)
+      .send({ name: 'Directory Test SaaS' });
+
+    const matching = await signup('directorymatch');
+    await request(app)
+      .put('/businesses/me/services')
+      .set('Authorization', `Bearer ${matching.token}`)
+      .send({ ids: [serviceRes.body.service.id] });
+    await request(app)
+      .put('/businesses/me/industries')
+      .set('Authorization', `Bearer ${matching.token}`)
+      .send({ ids: [industryRes.body.industry.id] });
+    await request(app)
+      .patch('/businesses/me')
+      .set('Authorization', `Bearer ${matching.token}`)
+      .send({ minProjectBudget: 2000 });
+
+    const nonMatching = await signup('directorynomatch');
+    void nonMatching;
+
+    const byServiceRes = await request(app).get(`/businesses/directory?service=${serviceRes.body.service.slug}`);
+    expect(byServiceRes.status).toBe(200);
+    const ids = byServiceRes.body.agencies.map((a: { id: string }) => a.id);
+    expect(ids).toContain(matching.business.id);
+    expect(ids).not.toContain(nonMatching.business.id);
+
+    const byIndustryRes = await request(app).get(`/businesses/directory?industry=${industryRes.body.industry.slug}`);
+    expect(byIndustryRes.body.agencies.map((a: { id: string }) => a.id)).toContain(matching.business.id);
+
+    const byBudgetRes = await request(app).get('/businesses/directory?maxBudget=1000');
+    expect(byBudgetRes.body.agencies.map((a: { id: string }) => a.id)).not.toContain(matching.business.id);
+
+    const withinBudgetRes = await request(app).get('/businesses/directory?maxBudget=5000');
+    expect(withinBudgetRes.body.agencies.map((a: { id: string }) => a.id)).toContain(matching.business.id);
+  });
 });

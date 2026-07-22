@@ -38,6 +38,50 @@ async function withStats(businessId: string, viewerId?: string) {
   });
 }
 
+const DIRECTORY_PAGE_SIZE = 20;
+
+/**
+ * Public directory listing for the new agency-directory site (Phase 2). Sort is a
+ * placeholder (verified-first, then newest) until the trust-score redesign discussed
+ * separately replaces it with a real relevance/quality ranking.
+ */
+businessesRouter.get('/directory', async (req, res) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  const serviceSlug = typeof req.query.service === 'string' ? req.query.service : undefined;
+  const industrySlug = typeof req.query.industry === 'string' ? req.query.industry : undefined;
+  const maxBudget = Number(req.query.maxBudget);
+
+  const where: Record<string, unknown> = { suspended: false };
+  if (q) where.OR = [{ name: { contains: q } }, { description: { contains: q } }];
+  if (serviceSlug) where.services = { some: { service: { slug: serviceSlug } } };
+  if (industrySlug) where.industries = { some: { industry: { slug: industrySlug } } };
+  if (Number.isFinite(maxBudget)) {
+    where.OR = [...(Array.isArray(where.OR) ? where.OR : []), { minProjectBudget: null }, { minProjectBudget: { lte: maxBudget } }];
+  }
+
+  const [businesses, total] = await Promise.all([
+    prisma.business.findMany({
+      where,
+      orderBy: [{ verified: 'desc' }, { createdAt: 'desc' }],
+      skip: (page - 1) * DIRECTORY_PAGE_SIZE,
+      take: DIRECTORY_PAGE_SIZE,
+      include: { services: { include: { service: true } }, industries: { include: { industry: true } } },
+    }),
+    prisma.business.count({ where }),
+  ]);
+
+  res.json({
+    agencies: businesses.map((b) => serializeBusiness(b, {
+      services: b.services.map((s) => s.service),
+      industries: b.industries.map((i) => i.industry),
+    })),
+    page,
+    hasMore: page * DIRECTORY_PAGE_SIZE < total,
+    total,
+  });
+});
+
 businessesRouter.get('/search', optionalAuth, async (req, res) => {
   const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   if (!q) return res.json({ businesses: [] });
