@@ -8,6 +8,7 @@ const SERVICES = [
   'SEO',
   'Paid Search',
   'Paid Social',
+  'TikTok Marketing',
   'Content Marketing',
   'Email Marketing',
   'Branding & Design',
@@ -24,8 +25,10 @@ const SERVICES = [
 
 const INDUSTRIES = [
   'SaaS',
+  'Healthcare Startups',
   'E-commerce',
   'Healthcare',
+  'Dental',
   'Real Estate',
   'Financial Services',
   'Education',

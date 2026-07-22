@@ -82,6 +82,45 @@ businessesRouter.get('/directory', async (req, res) => {
   });
 });
 
+/**
+ * Every (service, industry) combination that currently has at least one matching
+ * agency — drives the niche long-tail combo pages (/agencies/[service]/[industry])
+ * and their appearance in the sitemap. Computed in-memory rather than a SQL GROUP BY
+ * across the two join tables: at current and near-term scale (dozens to low
+ * hundreds of agencies) this is simpler and plenty fast; revisit if that changes.
+ */
+businessesRouter.get('/directory/combos', async (_req, res) => {
+  const businesses = await prisma.business.findMany({
+    where: { suspended: false },
+    select: {
+      services: { select: { service: { select: { slug: true, name: true } } } },
+      industries: { select: { industry: { select: { slug: true, name: true } } } },
+    },
+  });
+
+  const seen = new Map<string, { serviceSlug: string; serviceName: string; industrySlug: string; industryName: string; count: number }>();
+  for (const business of businesses) {
+    for (const { service } of business.services) {
+      for (const { industry } of business.industries) {
+        const key = `${service.slug}::${industry.slug}`;
+        const existing = seen.get(key);
+        if (existing) existing.count += 1;
+        else {
+          seen.set(key, {
+            serviceSlug: service.slug,
+            serviceName: service.name,
+            industrySlug: industry.slug,
+            industryName: industry.name,
+            count: 1,
+          });
+        }
+      }
+    }
+  }
+
+  res.json({ combos: Array.from(seen.values()) });
+});
+
 businessesRouter.get('/search', optionalAuth, async (req, res) => {
   const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   if (!q) return res.json({ businesses: [] });

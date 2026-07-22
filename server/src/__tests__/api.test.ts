@@ -1240,4 +1240,47 @@ describe('Verve API', () => {
     const withinBudgetRes = await request(app).get('/businesses/directory?maxBudget=5000');
     expect(withinBudgetRes.body.agencies.map((a: { id: string }) => a.id)).toContain(matching.business.id);
   });
+
+  it('reports service x industry combos only for pairs an agency actually has both of', async () => {
+    const adminLogin = await request(app).post('/auth/login').send({ email: 'admin@test.com', password: 'password123' });
+    const serviceRes = await request(app)
+      .post('/services')
+      .set('Authorization', `Bearer ${adminLogin.body.token}`)
+      .send({ name: 'Combo Test TikTok' });
+    const matchingIndustryRes = await request(app)
+      .post('/industries')
+      .set('Authorization', `Bearer ${adminLogin.body.token}`)
+      .send({ name: 'Combo Test Dental' });
+    const otherIndustryRes = await request(app)
+      .post('/industries')
+      .set('Authorization', `Bearer ${adminLogin.body.token}`)
+      .send({ name: 'Combo Test Legal' });
+
+    const agency = await signup('comboagency');
+    // Has the service and BOTH industries, but should only produce a combo for the
+    // (service, industry) pairs it actually holds simultaneously — not a false cross
+    // product with an industry it was never tagged with alongside this service.
+    await request(app)
+      .put('/businesses/me/services')
+      .set('Authorization', `Bearer ${agency.token}`)
+      .send({ ids: [serviceRes.body.service.id] });
+    await request(app)
+      .put('/businesses/me/industries')
+      .set('Authorization', `Bearer ${agency.token}`)
+      .send({ ids: [matchingIndustryRes.body.industry.id] });
+
+    const combosRes = await request(app).get('/businesses/directory/combos');
+    expect(combosRes.status).toBe(200);
+    const combos = combosRes.body.combos as { serviceSlug: string; industrySlug: string }[];
+    expect(
+      combos.some(
+        (c) => c.serviceSlug === serviceRes.body.service.slug && c.industrySlug === matchingIndustryRes.body.industry.slug,
+      ),
+    ).toBe(true);
+    expect(
+      combos.some(
+        (c) => c.serviceSlug === serviceRes.body.service.slug && c.industrySlug === otherIndustryRes.body.industry.slug,
+      ),
+    ).toBe(false);
+  });
 });
