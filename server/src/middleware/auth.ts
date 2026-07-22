@@ -43,6 +43,15 @@ export function requireOwner(req: AuthedRequest, res: Response, next: NextFuncti
   next();
 }
 
+/** Restricts an already-authenticated route to the single account named by env.adminEmail. */
+export async function requireAdmin(req: AuthedRequest, res: Response, next: NextFunction) {
+  const business = await prisma.business.findUnique({ where: { id: req.businessId! } });
+  if (!business || business.email !== env.adminEmail) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
 export async function optionalAuth(req: AuthedRequest, _res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (header && header.startsWith('Bearer ')) {

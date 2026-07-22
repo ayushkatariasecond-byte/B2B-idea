@@ -12,6 +12,14 @@ type BusinessLike = {
   verificationRequested: boolean;
   emailVerified?: boolean;
   createdAt: Date;
+  description?: string;
+  foundedYear?: number | null;
+  teamSize?: string | null;
+  headquartersLocation?: string | null;
+  website?: string | null;
+  minProjectBudget?: number | null;
+  hourlyRateMin?: number | null;
+  hourlyRateMax?: number | null;
 };
 
 export function serializeBusiness(b: BusinessLike, extra: Record<string, unknown> = {}) {
@@ -27,6 +35,14 @@ export function serializeBusiness(b: BusinessLike, extra: Record<string, unknown
     verificationRequested: b.verificationRequested,
     emailVerified: b.emailVerified ?? false,
     createdAt: b.createdAt,
+    description: b.description ?? '',
+    foundedYear: b.foundedYear ?? null,
+    teamSize: b.teamSize ?? null,
+    headquartersLocation: b.headquartersLocation ?? null,
+    website: b.website ?? null,
+    minProjectBudget: b.minProjectBudget ?? null,
+    hourlyRateMin: b.hourlyRateMin ?? null,
+    hourlyRateMax: b.hourlyRateMax ?? null,
     ...extra,
   };
 }

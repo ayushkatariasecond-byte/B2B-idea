@@ -14,6 +14,18 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+/** Escapes untrusted text (e.g. a buyer-submitted inquiry message) before it's interpolated
+ * into an email's HTML — unlike the other fields in this file, inquiry content is arbitrary
+ * public input, not something the account owner typed into their own profile. */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export async function sendEmail(opts: { to: string; subject: string; html: string }): Promise<void> {
   if (!ready) {
     console.log(`[email] (SENDGRID_API_KEY unset — not sent) "${opts.subject}" → ${opts.to}`);
@@ -75,6 +87,21 @@ export function sendVerifyEmail(opts: { to: string; verifyUrl: string }): Promis
     html: shell(`
       <p style="font-size:16px;line-height:1.5;">Confirm your email to secure your Verve account.</p>
       ${goldButton(opts.verifyUrl, 'Confirm your email')}`),
+  });
+}
+
+export function sendNewInquiryEmail(opts: { to: string; buyerName: string; buyerCompany?: string; message: string }): Promise<void> {
+  const buyerName = escapeHtml(opts.buyerName);
+  const buyerCompany = opts.buyerCompany ? escapeHtml(opts.buyerCompany) : undefined;
+  const message = escapeHtml(opts.message);
+  return sendEmail({
+    to: opts.to,
+    subject: `New inquiry from ${buyerName}`,
+    html: shell(`
+      <p style="font-size:16px;line-height:1.5;">You've got a new inquiry${buyerCompany ? ` from <b>${buyerCompany}</b>` : ''}.</p>
+      <p style="font-size:15px;line-height:1.6;color:#3a3426;"><b>${buyerName}</b> wrote:</p>
+      <div style="margin:14px 0;padding:12px 16px;background:#f3f2ee;border-radius:10px;font-size:14px;color:#3a3426;white-space:pre-wrap;">${message}</div>
+      ${goldButton(`${env.appWebUrl}/inquiries`, 'View inquiry')}`),
   });
 }
 

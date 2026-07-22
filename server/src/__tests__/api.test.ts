@@ -965,4 +965,235 @@ describe('Verve API', () => {
     const res = await createPost(business.token, { caption: 'DM me now, buy followers cheap!' });
     expect(res.status).toBe(400);
   });
+
+  // --- Directory pivot: agency profile fields ---
+
+  it('updates and returns the new agency directory profile fields', async () => {
+    const agency = await signup('dirprofileagency');
+    const res = await request(app)
+      .patch('/businesses/me')
+      .set('Authorization', `Bearer ${agency.token}`)
+      .send({
+        description: 'We build SEO campaigns for SaaS companies.',
+        foundedYear: 2015,
+        teamSize: '11-50',
+        headquartersLocation: 'Austin, TX',
+        website: 'https://example-agency.com',
+        minProjectBudget: 5000,
+        hourlyRateMin: 100,
+        hourlyRateMax: 200,
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.business.description).toBe('We build SEO campaigns for SaaS companies.');
+    expect(res.body.business.foundedYear).toBe(2015);
+    expect(res.body.business.teamSize).toBe('11-50');
+    expect(res.body.business.headquartersLocation).toBe('Austin, TX');
+    expect(res.body.business.website).toBe('https://example-agency.com');
+    expect(res.body.business.minProjectBudget).toBe(5000);
+    expect(res.body.business.hourlyRateMin).toBe(100);
+    expect(res.body.business.hourlyRateMax).toBe(200);
+  });
+
+  // --- Directory pivot: Service/Industry taxonomy ---
+
+  it('rejects non-admins from creating taxonomy entries, and lets the admin add and list them', async () => {
+    const nonAdmin = await signup('taxonomynonadmin');
+    const deniedRes = await request(app)
+      .post('/services')
+      .set('Authorization', `Bearer ${nonAdmin.token}`)
+      .send({ name: 'Should Fail Service' });
+    expect(deniedRes.status).toBe(403);
+
+    const adminLogin = await request(app).post('/auth/login').send({ email: 'admin@test.com', password: 'password123' });
+    expect(adminLogin.status).toBe(200);
+
+    const createRes = await request(app)
+      .post('/services')
+      .set('Authorization', `Bearer ${adminLogin.body.token}`)
+      .send({ name: 'Taxonomy Test Service' });
+    expect(createRes.status).toBe(201);
+    expect(createRes.body.service.slug).toBe('taxonomy-test-service');
+
+    const listRes = await request(app).get('/services');
+    expect(listRes.status).toBe(200);
+    expect(listRes.body.services.some((s: { slug: string }) => s.slug === 'taxonomy-test-service')).toBe(true);
+  });
+
+  it('lets an agency select its services and industries', async () => {
+    const adminLogin = await request(app).post('/auth/login').send({ email: 'admin@test.com', password: 'password123' });
+    const serviceRes = await request(app)
+      .post('/services')
+      .set('Authorization', `Bearer ${adminLogin.body.token}`)
+      .send({ name: 'Select Test Service' });
+    const industryRes = await request(app)
+      .post('/industries')
+      .set('Authorization', `Bearer ${adminLogin.body.token}`)
+      .send({ name: 'Select Test Industry' });
+
+    const agency = await signup('taxonomyselectagency');
+    const servicesRes = await request(app)
+      .put('/businesses/me/services')
+      .set('Authorization', `Bearer ${agency.token}`)
+      .send({ ids: [serviceRes.body.service.id] });
+    expect(servicesRes.status).toBe(200);
+    expect(servicesRes.body.services).toHaveLength(1);
+    expect(servicesRes.body.services[0].id).toBe(serviceRes.body.service.id);
+
+    const industriesRes = await request(app)
+      .put('/businesses/me/industries')
+      .set('Authorization', `Bearer ${agency.token}`)
+      .send({ ids: [industryRes.body.industry.id] });
+    expect(industriesRes.status).toBe(200);
+    expect(industriesRes.body.industries).toHaveLength(1);
+  });
+
+  // --- Directory pivot: CaseStudy CRUD + media + results ---
+
+  it('runs a case study through its full lifecycle: draft visibility, publish, media, results, delete', async () => {
+    const agency = await signup('casestudyagency');
+    const other = await signup('casestudyviewer');
+
+    const createRes = await request(app)
+      .post('/case-studies')
+      .set('Authorization', `Bearer ${agency.token}`)
+      .send({ title: 'SaaS SEO Turnaround', clientName: 'Acme SaaS', summary: 'Tripled organic traffic in 6 months.' });
+    expect(createRes.status).toBe(201);
+    const caseStudyId = createRes.body.caseStudy.id;
+    expect(createRes.body.caseStudy.status).toBe('draft');
+
+    // Draft is visible to the owner, not to anyone else.
+    const ownerViewRes = await request(app).get(`/case-studies/${caseStudyId}`).set('Authorization', `Bearer ${agency.token}`);
+    expect(ownerViewRes.status).toBe(200);
+    const otherViewRes = await request(app).get(`/case-studies/${caseStudyId}`).set('Authorization', `Bearer ${other.token}`);
+    expect(otherViewRes.status).toBe(404);
+
+    const publishRes = await request(app)
+      .patch(`/case-studies/${caseStudyId}`)
+      .set('Authorization', `Bearer ${agency.token}`)
+      .send({ status: 'published' });
+    expect(publishRes.status).toBe(200);
+    expect(publishRes.body.caseStudy.status).toBe('published');
+
+    const nowVisibleRes = await request(app).get(`/case-studies/${caseStudyId}`);
+    expect(nowVisibleRes.status).toBe(200);
+
+    const mediaRes = await request(app)
+      .post(`/case-studies/${caseStudyId}/media`)
+      .set('Authorization', `Bearer ${agency.token}`)
+      .field('sortOrder', '0')
+      .attach('media', path.join(__dirname, 'fixtures', 'sample.png'));
+    expect(mediaRes.status).toBe(201);
+    expect(mediaRes.body.media.mediaType).toBe('image');
+
+    const resultRes = await request(app)
+      .post(`/case-studies/${caseStudyId}/results`)
+      .set('Authorization', `Bearer ${agency.token}`)
+      .send({ metricLabel: 'Organic traffic', metricValue: '+220%' });
+    expect(resultRes.status).toBe(201);
+
+    const withMediaRes = await request(app).get(`/case-studies/${caseStudyId}`);
+    expect(withMediaRes.body.caseStudy.media).toHaveLength(1);
+    expect(withMediaRes.body.caseStudy.results).toHaveLength(1);
+    expect(withMediaRes.body.caseStudy.results[0].metricValue).toBe('+220%');
+
+    const editResultRes = await request(app)
+      .patch(`/case-studies/${caseStudyId}/results/${resultRes.body.result.id}`)
+      .set('Authorization', `Bearer ${agency.token}`)
+      .send({ metricValue: '+250%' });
+    expect(editResultRes.status).toBe(200);
+    expect(editResultRes.body.result.metricValue).toBe('+250%');
+
+    // A different agency can't edit or delete this agency's case study.
+    const intruderPatchRes = await request(app)
+      .patch(`/case-studies/${caseStudyId}`)
+      .set('Authorization', `Bearer ${other.token}`)
+      .send({ title: 'Hijacked' });
+    expect(intruderPatchRes.status).toBe(404);
+
+    const listRes = await request(app).get(`/businesses/${agency.business.id}/case-studies`);
+    expect(listRes.body.caseStudies.some((c: { id: string }) => c.id === caseStudyId)).toBe(true);
+
+    const deleteMediaRes = await request(app)
+      .delete(`/case-studies/${caseStudyId}/media/${mediaRes.body.media.id}`)
+      .set('Authorization', `Bearer ${agency.token}`);
+    expect(deleteMediaRes.status).toBe(200);
+
+    const deleteRes = await request(app).delete(`/case-studies/${caseStudyId}`).set('Authorization', `Bearer ${agency.token}`);
+    expect(deleteRes.status).toBe(200);
+    const goneRes = await request(app).get(`/case-studies/${caseStudyId}`);
+    expect(goneRes.status).toBe(404);
+  });
+
+  it('rejects a case study whose content matches the spam denylist', async () => {
+    const agency = await signup('casestudyspamagency');
+    const res = await request(app)
+      .post('/case-studies')
+      .set('Authorization', `Bearer ${agency.token}`)
+      .send({ title: 'buy followers guaranteed profit', summary: 'n/a' });
+    expect(res.status).toBe(400);
+  });
+
+  // --- Directory pivot: Inquiries + lightweight Buyers ---
+
+  it('lets an anonymous buyer submit an inquiry, notifies the agency, and scopes the inbox to the right agency', async () => {
+    const agency = await signup('inquiryagency');
+    const otherAgency = await signup('inquiryotheragency');
+
+    const inquiryRes = await request(app).post('/inquiries').send({
+      agencyId: agency.business.id,
+      name: 'Jamie Buyer',
+      email: 'jamie@buyerco.com',
+      company: 'Buyer Co',
+      message: 'We need help with SEO for our SaaS product.',
+      budget: '$5k-$10k/mo',
+    });
+    expect(inquiryRes.status).toBe(201);
+    expect(inquiryRes.body.inquiry.status).toBe('new');
+
+    const inboxRes = await request(app).get('/inquiries').set('Authorization', `Bearer ${agency.token}`);
+    expect(inboxRes.status).toBe(200);
+    expect(inboxRes.body.inquiries).toHaveLength(1);
+    expect(inboxRes.body.inquiries[0].buyer.email).toBe('jamie@buyerco.com');
+
+    const otherInboxRes = await request(app).get('/inquiries').set('Authorization', `Bearer ${otherAgency.token}`);
+    expect(otherInboxRes.body.inquiries).toHaveLength(0);
+
+    const updateRes = await request(app)
+      .patch(`/inquiries/${inquiryRes.body.inquiry.id}`)
+      .set('Authorization', `Bearer ${agency.token}`)
+      .send({ status: 'contacted' });
+    expect(updateRes.status).toBe(200);
+    expect(updateRes.body.inquiry.status).toBe('contacted');
+
+    const intruderUpdateRes = await request(app)
+      .patch(`/inquiries/${inquiryRes.body.inquiry.id}`)
+      .set('Authorization', `Bearer ${otherAgency.token}`)
+      .send({ status: 'closed' });
+    expect(intruderUpdateRes.status).toBe(404);
+  });
+
+  it('rejects an inquiry whose message matches the spam denylist', async () => {
+    const agency = await signup('inquiryspamagency');
+    const res = await request(app).post('/inquiries').send({
+      agencyId: agency.business.id,
+      name: 'Spammer',
+      email: 'spammer@test.com',
+      message: 'guaranteed profit wire transfer now',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('upserts a buyer by email instead of creating duplicates', async () => {
+    const createRes = await request(app).post('/buyers').send({ email: 'repeatbuyer@test.com', name: 'First Name' });
+    expect(createRes.status).toBe(201);
+
+    const upsertRes = await request(app).post('/buyers').send({ email: 'repeatbuyer@test.com', name: 'Updated Name' });
+    expect(upsertRes.status).toBe(201);
+    expect(upsertRes.body.buyer.id).toBe(createRes.body.buyer.id);
+    expect(upsertRes.body.buyer.name).toBe('Updated Name');
+
+    const readRes = await request(app).get(`/buyers/${createRes.body.buyer.id}`);
+    expect(readRes.status).toBe(200);
+    expect(readRes.body.buyer.email).toBe('repeatbuyer@test.com');
+  });
 });

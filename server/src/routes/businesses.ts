@@ -82,6 +82,14 @@ const updateSchema = z.object({
   name: z.string().min(2).max(80).optional(),
   category: z.string().min(2).max(60).optional(),
   bio: z.string().max(280).optional(),
+  description: z.string().max(4000).optional(),
+  foundedYear: z.number().int().min(1800).max(new Date().getFullYear()).nullable().optional(),
+  teamSize: z.string().max(20).nullable().optional(),
+  headquartersLocation: z.string().max(120).nullable().optional(),
+  website: z.string().url().max(300).nullable().optional(),
+  minProjectBudget: z.number().int().min(0).nullable().optional(),
+  hourlyRateMin: z.number().int().min(0).nullable().optional(),
+  hourlyRateMax: z.number().int().min(0).nullable().optional(),
 });
 
 businessesRouter.patch('/me', requireAuth, async (req: AuthedRequest, res) => {
@@ -259,4 +267,54 @@ businessesRouter.get('/:id/posts', optionalAuth, async (req: AuthedRequest, res)
     },
   });
   res.json({ posts: posts.map(serializePost) });
+});
+
+// ── Directory profile: services, industries, case studies ─────────────────────────
+
+const idListSchema = z.object({ ids: z.array(z.string().min(1)).max(50) });
+
+businessesRouter.put('/me/services', requireAuth, async (req: AuthedRequest, res) => {
+  const parsed = idListSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'ids must be an array of service ids' });
+
+  await prisma.$transaction([
+    prisma.agencyService.deleteMany({ where: { agencyId: req.businessId! } }),
+    prisma.agencyService.createMany({
+      data: parsed.data.ids.map((serviceId) => ({ agencyId: req.businessId!, serviceId })),
+      skipDuplicates: true,
+    }),
+  ]);
+  const services = await prisma.agencyService.findMany({
+    where: { agencyId: req.businessId! },
+    include: { service: true },
+  });
+  res.json({ services: services.map((s) => s.service) });
+});
+
+businessesRouter.put('/me/industries', requireAuth, async (req: AuthedRequest, res) => {
+  const parsed = idListSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'ids must be an array of industry ids' });
+
+  await prisma.$transaction([
+    prisma.agencyIndustry.deleteMany({ where: { agencyId: req.businessId! } }),
+    prisma.agencyIndustry.createMany({
+      data: parsed.data.ids.map((industryId) => ({ agencyId: req.businessId!, industryId })),
+      skipDuplicates: true,
+    }),
+  ]);
+  const industries = await prisma.agencyIndustry.findMany({
+    where: { agencyId: req.businessId! },
+    include: { industry: true },
+  });
+  res.json({ industries: industries.map((i) => i.industry) });
+});
+
+businessesRouter.get('/:id/case-studies', optionalAuth, async (req: AuthedRequest, res) => {
+  const isOwner = req.businessId === req.params.id;
+  const caseStudies = await prisma.caseStudy.findMany({
+    where: { agencyId: req.params.id, ...(isOwner ? {} : { status: 'published', hidden: false }) },
+    orderBy: { createdAt: 'desc' },
+    include: { media: { orderBy: { sortOrder: 'asc' } }, results: { orderBy: { sortOrder: 'asc' } } },
+  });
+  res.json({ caseStudies });
 });

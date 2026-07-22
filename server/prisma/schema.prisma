@@ -24,6 +24,17 @@ model Business {
   expoPushToken          String?
   createdAt              DateTime @default(now())
 
+  // ── Agency directory profile fields (additive; `category`/`bio` above are untouched
+  // and still used by the existing feed/discover code) ──────────────────────────────
+  description        String   @default("") // long-form "About us", distinct from the shorter `bio`
+  foundedYear        Int?
+  teamSize           String?  // a label like "11-50", not a strict enum/table — see migration notes
+  headquartersLocation String?
+  website            String?
+  minProjectBudget   Int?     // USD
+  hourlyRateMin      Int?     // USD
+  hourlyRateMax      Int?     // USD
+
   posts           Post[]
   likes           Like[]
   comments        Comment[]
@@ -42,6 +53,12 @@ model Business {
   reportsFiled    Report[]
   stories         Story[]
   storyViews      StoryView[]
+
+  caseStudies       CaseStudy[]
+  services          AgencyService[]
+  industries        AgencyIndustry[]
+  inquiriesReceived Inquiry[]
+  reviewsReceived   Review[]
 }
 
 model BusinessMember {
@@ -170,7 +187,7 @@ model Notification {
   recipient   Business @relation("NotificationRecipient", fields: [recipientId], references: [id])
   actorId     String?
   actor       Business? @relation("NotificationActor", fields: [actorId], references: [id])
-  type        String   // "like" | "comment" | "follow" | "message"
+  type        String   // "like" | "comment" | "follow" | "message" | "inquiry"
   postId      String?
   threadId    String?
   read        Boolean  @default(false)
@@ -251,4 +268,146 @@ model Message {
   readAt     DateTime?
 
   @@index([threadId])
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Directory pivot (Phase 1 — schema foundation). Purely additive: nothing above this
+// line is touched, the existing feed/social models keep working exactly as before.
+// ════════════════════════════════════════════════════════════════════════════════
+
+model Service {
+  id   String @id @default(cuid())
+  name String
+  slug String @unique
+
+  agencies AgencyService[]
+}
+
+model Industry {
+  id   String @id @default(cuid())
+  name String
+  slug String @unique
+
+  agencies AgencyIndustry[]
+}
+
+model AgencyService {
+  id         String   @id @default(cuid())
+  agencyId   String
+  agency     Business @relation(fields: [agencyId], references: [id])
+  serviceId  String
+  service    Service  @relation(fields: [serviceId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@unique([agencyId, serviceId])
+  @@index([serviceId])
+}
+
+model AgencyIndustry {
+  id         String   @id @default(cuid())
+  agencyId   String
+  agency     Business @relation(fields: [agencyId], references: [id])
+  industryId String
+  industry   Industry @relation(fields: [industryId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@unique([agencyId, industryId])
+  @@index([industryId])
+}
+
+model CaseStudy {
+  id         String   @id @default(cuid())
+  agencyId   String
+  agency     Business @relation(fields: [agencyId], references: [id])
+  title      String
+  clientName String?
+  summary    String   @default("")
+  status     String   @default("draft") // "draft" | "published"
+  hidden     Boolean  @default(false) // moderation, same meaning as Post.hidden
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  media   CaseStudyMedia[]
+  results CaseStudyResult[]
+  reviews Review[]
+
+  @@index([agencyId])
+  @@index([status])
+  @@index([hidden])
+}
+
+model CaseStudyMedia {
+  id           String    @id @default(cuid())
+  caseStudyId  String
+  caseStudy    CaseStudy @relation(fields: [caseStudyId], references: [id])
+  mediaUrl     String
+  mediaType    String    // "image" | "video"
+  thumbnailUrl String?
+  sortOrder    Int       @default(0)
+  createdAt    DateTime  @default(now())
+
+  @@index([caseStudyId])
+}
+
+model CaseStudyResult {
+  id          String    @id @default(cuid())
+  caseStudyId String
+  caseStudy   CaseStudy @relation(fields: [caseStudyId], references: [id])
+  metricLabel String    // e.g. "Organic traffic"
+  metricValue String    // kept as text, not a number — real results are often "+150%", "3x ROAS", "#1 ranking"
+  sortOrder   Int       @default(0)
+
+  @@index([caseStudyId])
+}
+
+model Inquiry {
+  id        String   @id @default(cuid())
+  agencyId  String
+  agency    Business @relation(fields: [agencyId], references: [id])
+  buyerId   String?
+  buyer     Buyer?   @relation(fields: [buyerId], references: [id])
+  name      String
+  email     String
+  company   String?
+  message   String
+  budget    String?
+  status    String   @default("new") // "new" | "contacted" | "closed"
+  createdAt DateTime @default(now())
+
+  @@index([agencyId])
+  @@index([status])
+}
+
+/// Lightweight, optional, email-only buyer identity — no password. Created implicitly
+/// whenever an inquiry comes in under a given email, or explicitly via POST /buyers.
+model Buyer {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+
+  inquiries Inquiry[]
+  reviews   Review[]
+}
+
+/// Schema only for now (per the deferred Reviews decision) — no routes yet. Requires a
+/// Buyer (unlike Inquiry, where buyerId is optional) because an anonymous review is a
+/// worthless/spammable trust signal; an inquiry doesn't carry the same stakes.
+model Review {
+  id          String     @id @default(cuid())
+  agencyId    String
+  agency      Business   @relation(fields: [agencyId], references: [id])
+  buyerId     String
+  buyer       Buyer      @relation(fields: [buyerId], references: [id])
+  caseStudyId String?
+  caseStudy   CaseStudy? @relation(fields: [caseStudyId], references: [id])
+  rating      Int        // 1-5
+  title       String?
+  body        String
+  status      String     @default("pending") // "pending" | "published" | "rejected"
+  hidden      Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+
+  @@index([agencyId])
+  @@index([status])
 }

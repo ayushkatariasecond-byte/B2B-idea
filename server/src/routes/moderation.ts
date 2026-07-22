@@ -1,18 +1,9 @@
-import { NextFunction, Response, Router } from 'express';
+import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db';
-import { requireAuth, AuthedRequest } from '../middleware/auth';
-import { env } from '../env';
+import { requireAuth, requireAdmin } from '../middleware/auth';
 
 export const moderationRouter = Router();
-
-async function requireAdmin(req: AuthedRequest, res: Response, next: NextFunction) {
-  const business = await prisma.business.findUnique({ where: { id: req.businessId! } });
-  if (!business || business.email !== env.adminEmail) {
-    return res.status(403).json({ error: 'Admin access required' });
-  }
-  next();
-}
 
 async function targetPreview(targetType: string, targetId: string) {
   if (targetType === 'post') {
