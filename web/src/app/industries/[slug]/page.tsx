@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { fetchDirectory, fetchIndustryBySlug, fetchIndustries } from '@/lib/api';
+import { fetchDirectory, fetchIndustryBySlug, fetchIndustries, fetchDirectoryCombos } from '@/lib/api';
 import { AgencyCard } from '@/components/AgencyCard';
 
 interface Props {
@@ -27,12 +28,27 @@ export default async function IndustryPage({ params }: Props) {
   const industry = await fetchIndustryBySlug(slug);
   if (!industry) notFound();
 
-  const directory = await fetchDirectory({ industry: slug });
+  const [directory, combos] = await Promise.all([
+    fetchDirectory({ industry: slug }),
+    fetchDirectoryCombos().catch(() => []),
+  ]);
+  const relatedServices = combos.filter((c) => c.industrySlug === slug);
 
   return (
     <div className="container section">
       <div className="eyebrow">Industry</div>
       <h1 className="section-title">Agencies for {industry.name}</h1>
+
+      {relatedServices.length > 0 && (
+        <div className="pill-row" style={{ justifyContent: 'flex-start', marginBottom: 28 }}>
+          {relatedServices.map((c) => (
+            <Link key={c.serviceSlug} href={`/agencies/${c.serviceSlug}/${slug}`} className="pill">
+              {c.serviceName}
+            </Link>
+          ))}
+        </div>
+      )}
+
       {directory.agencies.length === 0 ? (
         <p className="empty-state">No agencies listed for {industry.name} yet.</p>
       ) : (

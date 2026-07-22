@@ -2,6 +2,14 @@ import type { Agency, CaseStudy, DirectoryResponse, Industry, Service } from './
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
+/** Media URLs come back two shapes: an absolute Supabase Storage URL in production, or a
+ * relative `/uploads/...` path when storage isn't configured (local dev) — the latter is
+ * served by the backend, not this Next.js app, so it needs the API origin prefixed. Same
+ * pattern the Expo app's client.ts already uses for exactly this reason. */
+export function resolveMediaUrl(url: string): string {
+  return url.startsWith('/') ? `${API_URL}${url}` : url;
+}
+
 /** Every fetch here runs on the server (page components are Server Components by
  * default) except the inquiry form, which is a client component and calls this same
  * function from the browser — that's why the base URL is NEXT_PUBLIC_, not server-only. */
@@ -68,6 +76,22 @@ export async function fetchServiceBySlug(slug: string): Promise<Service | null> 
 export async function fetchIndustryBySlug(slug: string): Promise<Industry | null> {
   const industries = await fetchIndustries();
   return industries.find((i) => i.slug === slug) ?? null;
+}
+
+export interface ServiceIndustryCombo {
+  serviceSlug: string;
+  serviceName: string;
+  industrySlug: string;
+  industryName: string;
+  count: number;
+}
+
+/** Every (service, industry) pair that currently has at least one matching agency —
+ * used to build the niche combo pages' sitemap entries and the "related" links shown
+ * on the single-dimension service/industry hub pages. */
+export async function fetchDirectoryCombos(): Promise<ServiceIndustryCombo[]> {
+  const data = await apiFetch<{ combos: ServiceIndustryCombo[] }>('/businesses/directory/combos');
+  return data.combos;
 }
 
 export async function submitInquiry(input: {

@@ -20,13 +20,15 @@ async function withStats(businessId: string, viewerId?: string) {
   const business = await prisma.business.findUnique({ where: { id: businessId } });
   if (!business) return null;
 
-  const [postCount, followerCount, followingCount, isFollowedByMe] = await Promise.all([
+  const [postCount, followerCount, followingCount, isFollowedByMe, services, industries] = await Promise.all([
     prisma.post.count({ where: { businessId, ...visibilityWhere() } }),
     prisma.follow.count({ where: { followeeId: businessId } }),
     prisma.follow.count({ where: { followerId: businessId } }),
     viewerId
       ? prisma.follow.findUnique({ where: { followerId_followeeId: { followerId: viewerId, followeeId: businessId } } })
       : null,
+    prisma.agencyService.findMany({ where: { agencyId: businessId }, include: { service: true } }),
+    prisma.agencyIndustry.findMany({ where: { agencyId: businessId }, include: { industry: true } }),
   ]);
 
   return serializeBusiness(business, {
@@ -35,6 +37,8 @@ async function withStats(businessId: string, viewerId?: string) {
     followingCount,
     isFollowedByMe: Boolean(isFollowedByMe),
     isMe: viewerId === businessId,
+    services: services.map((s) => s.service),
+    industries: industries.map((i) => i.industry),
   });
 }
 

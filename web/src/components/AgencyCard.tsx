@@ -1,4 +1,6 @@
+import Image from 'next/image';
 import Link from 'next/link';
+import { resolveMediaUrl } from '@/lib/api';
 import type { Agency } from '@/lib/types';
 
 function formatBudget(agency: Agency): string | null {
@@ -10,10 +12,15 @@ function formatBudget(agency: Agency): string | null {
 export function AgencyCard({ agency }: { agency: Agency }) {
   const budget = formatBudget(agency);
   return (
-    <Link href={`/agencies/${agency.handle}`} className="agency-card">
+    <Link href={`/agency/${agency.handle}`} className="agency-card">
       <div className="agency-card-top">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="avatar" src={agency.avatarUrl || '/agency-placeholder.svg'} alt="" />
+        <Image
+          className="avatar"
+          src={agency.avatarUrl ? resolveMediaUrl(agency.avatarUrl) : '/agency-placeholder.svg'}
+          alt=""
+          width={44}
+          height={44}
+        />
         <div>
           <div className="agency-name">
             {agency.name}
@@ -35,3 +42,4 @@ export function AgencyCard({ agency }: { agency: Agency }) {
     </Link>
   );
 }
+

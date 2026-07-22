@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { fetchDirectory, fetchServices, fetchIndustries } from '@/lib/api';
+import { fetchDirectory, fetchServices, fetchIndustries, fetchDirectoryCombos } from '@/lib/api';
 
 const SITE_URL = process.env.SITE_URL || 'http://localhost:3000';
 
@@ -17,10 +17,11 @@ async function fetchAllAgencies() {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [agencies, services, industries] = await Promise.all([
+  const [agencies, services, industries, combos] = await Promise.all([
     fetchAllAgencies(),
     fetchServices().catch(() => []),
     fetchIndustries().catch(() => []),
+    fetchDirectoryCombos().catch(() => []),
   ]);
 
   const staticEntries: MetadataRoute.Sitemap = [
@@ -29,7 +30,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   const agencyEntries: MetadataRoute.Sitemap = agencies.map((agency) => ({
-    url: `${SITE_URL}/agencies/${agency.handle}`,
+    url: `${SITE_URL}/agency/${agency.handle}`,
     priority: 0.8,
   }));
 
@@ -43,5 +44,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
-  return [...staticEntries, ...agencyEntries, ...serviceEntries, ...industryEntries];
+  // Only combos with at least one matching agency — an empty niche page is thin
+  // content that shouldn't be submitted to search engines (it still renders fine if
+  // someone lands on it directly, just isn't promoted until it has something to show).
+  const comboEntries: MetadataRoute.Sitemap = combos.map((c) => ({
+    url: `${SITE_URL}/agencies/${c.serviceSlug}/${c.industrySlug}`,
+    priority: 0.7,
+  }));
+
+  return [...staticEntries, ...agencyEntries, ...serviceEntries, ...industryEntries, ...comboEntries];
 }

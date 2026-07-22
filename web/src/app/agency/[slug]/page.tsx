@@ -1,15 +1,17 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { fetchAgencyByHandle, fetchCaseStudies } from '@/lib/api';
+import { fetchAgencyByHandle, fetchCaseStudies, resolveMediaUrl } from '@/lib/api';
 import { InquiryForm } from '@/components/InquiryForm';
 
 interface Props {
-  params: Promise<{ handle: string }>;
+  params: Promise<{ slug: string }>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { handle } = await params;
-  const agency = await fetchAgencyByHandle(handle);
+  const { slug } = await params;
+  const agency = await fetchAgencyByHandle(slug);
   if (!agency) return {};
   const description = agency.description || agency.bio || `${agency.name} is a ${agency.category} agency.`;
   return {
@@ -18,12 +20,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: agency.name,
       description,
-      images: agency.coverUrl ? [agency.coverUrl] : agency.avatarUrl ? [agency.avatarUrl] : [],
+      images: agency.coverUrl
+        ? [resolveMediaUrl(agency.coverUrl)]
+        : agency.avatarUrl
+          ? [resolveMediaUrl(agency.avatarUrl)]
+          : [],
     },
   };
 }
 
-function formatBudgetFacts(agency: NonNullable<Awaited<ReturnType<typeof fetchAgencyByHandle>>>) {
+function formatBudgetFacts(agency: NonNullable<Awaited<ReturnType<typeof fetchAgencyByHandle>>>, caseStudyCount: number) {
   const facts: { label: string; value: string }[] = [];
   if (agency.foundedYear) facts.push({ label: 'Founded', value: String(agency.foundedYear) });
   if (agency.teamSize) facts.push({ label: 'Team size', value: agency.teamSize });
@@ -35,16 +41,17 @@ function formatBudgetFacts(agency: NonNullable<Awaited<ReturnType<typeof fetchAg
       value: `$${agency.hourlyRateMin}${agency.hourlyRateMax ? `–$${agency.hourlyRateMax}` : '+'}`,
     });
   }
+  facts.push({ label: 'Case studies', value: String(caseStudyCount) });
   return facts;
 }
 
 export default async function AgencyProfilePage({ params }: Props) {
-  const { handle } = await params;
-  const agency = await fetchAgencyByHandle(handle);
+  const { slug } = await params;
+  const agency = await fetchAgencyByHandle(slug);
   if (!agency) notFound();
 
   const caseStudies = await fetchCaseStudies(agency.id);
-  const facts = formatBudgetFacts(agency);
+  const facts = formatBudgetFacts(agency, caseStudies.length);
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -52,8 +59,9 @@ export default async function AgencyProfilePage({ params }: Props) {
     name: agency.name,
     description: agency.description || agency.bio,
     url: agency.website || undefined,
-    image: agency.avatarUrl || undefined,
+    image: agency.avatarUrl ? resolveMediaUrl(agency.avatarUrl) : undefined,
     address: agency.headquartersLocation ? { '@type': 'PostalAddress', addressLocality: agency.headquartersLocation } : undefined,
+    knowsAbout: agency.services?.map((s) => s.name),
   };
 
   return (
@@ -62,23 +70,29 @@ export default async function AgencyProfilePage({ params }: Props) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <div className="profile-header">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="avatar" src={agency.avatarUrl || '/agency-placeholder.svg'} alt="" />
+        <Image
+          className="avatar"
+          src={agency.avatarUrl ? resolveMediaUrl(agency.avatarUrl) : '/agency-placeholder.svg'}
+          alt=""
+          width={80}
+          height={80}
+        />
         <div>
           <h1>
             {agency.name}
             {agency.verified && <span className="verified-badge"> · Verified</span>}
           </h1>
-          <p className="agency-meta">{agency.category}</p>
-          {agency.services && agency.services.length > 0 && (
-            <div className="tag-row">
-              {agency.services.map((s) => (
-                <span key={s.id} className="tag">
-                  {s.name}
-                </span>
-              ))}
-            </div>
-          )}
+          <p className="agency-meta">
+            {agency.category}
+            {agency.website && (
+              <>
+                {' · '}
+                <a href={agency.website} target="_blank" rel="noopener noreferrer nofollow">
+                  Website
+                </a>
+              </>
+            )}
+          </p>
         </div>
       </div>
 
@@ -97,6 +111,36 @@ export default async function AgencyProfilePage({ params }: Props) {
             </div>
           )}
 
+          {agency.services && agency.services.length > 0 && (
+            <>
+              <div className="fact-label" style={{ marginBottom: 8 }}>
+                Services
+              </div>
+              <div className="tag-row" style={{ marginBottom: 20 }}>
+                {agency.services.map((s) => (
+                  <Link key={s.id} href={`/services/${s.slug}`} className="tag">
+                    {s.name}
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
+
+          {agency.industries && agency.industries.length > 0 && (
+            <>
+              <div className="fact-label" style={{ marginBottom: 8 }}>
+                Industries served
+              </div>
+              <div className="tag-row" style={{ marginBottom: 20 }}>
+                {agency.industries.map((i) => (
+                  <Link key={i.id} href={`/industries/${i.slug}`} className="tag">
+                    {i.name}
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
+
           <h2 className="section-title">Case studies</h2>
           {caseStudies.length === 0 ? (
             <p className="empty-state">No published case studies yet.</p>
@@ -110,10 +154,22 @@ export default async function AgencyProfilePage({ params }: Props) {
                   <div className="case-study-media">
                     {cs.media.map((m) =>
                       m.mediaType === 'video' ? (
-                        <video key={m.id} src={m.mediaUrl} controls poster={m.thumbnailUrl || undefined} />
+                        <video
+                          key={m.id}
+                          src={resolveMediaUrl(m.mediaUrl)}
+                          controls
+                          poster={m.thumbnailUrl ? resolveMediaUrl(m.thumbnailUrl) : undefined}
+                        />
                       ) : (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img key={m.id} src={m.mediaUrl} alt={cs.title} />
+                        <div key={m.id} className="media-item">
+                          <Image
+                            src={resolveMediaUrl(m.mediaUrl)}
+                            alt={cs.title}
+                            fill
+                            sizes="(max-width: 720px) 50vw, 220px"
+                            style={{ objectFit: 'cover' }}
+                          />
+                        </div>
                       ),
                     )}
                   </div>
