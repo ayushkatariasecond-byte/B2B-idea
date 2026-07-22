@@ -1,15 +1,11 @@
 import { execSync } from 'child_process';
 import path from 'path';
-import fs from 'fs';
+import { TEST_DATABASE_URL } from './testDbUrl';
 
 export default function globalSetup(): void {
-  const dbPath = path.join(__dirname, '..', 'prisma', 'test.db');
-  for (const p of [dbPath, `${dbPath}-journal`]) {
-    if (fs.existsSync(p)) fs.rmSync(p);
-  }
-  execSync('npx prisma migrate deploy', {
+  execSync('npx prisma db push --force-reset --accept-data-loss --skip-generate', {
     cwd: path.join(__dirname, '..'),
-    env: { ...process.env, DATABASE_URL: 'file:./test.db' },
+    env: { ...process.env, DATABASE_URL: TEST_DATABASE_URL },
     stdio: 'inherit',
   });
 }

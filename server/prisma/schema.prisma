@@ -20,6 +20,7 @@ model Business {
   verified               Boolean  @default(false)
   verificationRequested  Boolean  @default(false)
   emailVerified          Boolean  @default(false)
+  suspended              Boolean  @default(false)
   expoPushToken          String?
   createdAt              DateTime @default(now())
 
@@ -67,6 +68,7 @@ model Post {
   shareCount      Int      @default(0)
   status          String   @default("published") // "draft" | "scheduled" | "published"
   scheduledFor    DateTime?
+  hidden          Boolean  @default(false)
   createdAt       DateTime @default(now())
 
   likes     Like[]
@@ -78,6 +80,7 @@ model Post {
   @@index([businessId])
   @@index([tag])
   @@index([status])
+  @@index([hidden])
 }
 
 model Story {
@@ -154,7 +157,11 @@ model Report {
   targetType String   // "post" | "comment" | "business"
   targetId   String
   reason     String
+  status     String   @default("open") // "open" | "resolved" | "dismissed"
   createdAt  DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([status])
 }
 
 model Notification {
@@ -191,6 +198,7 @@ model Comment {
   businessId String
   business   Business @relation(fields: [businessId], references: [id])
   text       String
+  hidden     Boolean  @default(false)
   createdAt  DateTime @default(now())
 
   @@index([postId])

@@ -25,6 +25,9 @@ export const env = {
   emailFrom: process.env.EMAIL_FROM || 'ayushkatariasecond@gmail.com',
   emailFromName: process.env.EMAIL_FROM_NAME || 'Verve',
 
+  // The one account allowed to use the moderation endpoints (view/act on reports).
+  adminEmail: process.env.ADMIN_EMAIL || 'ayushkatariasecond@gmail.com',
+
   // File storage (Supabase Storage). Off unless url + service key are provided; otherwise
   // uploads stay on local disk exactly as before.
   supabaseUrl: process.env.SUPABASE_URL || '',

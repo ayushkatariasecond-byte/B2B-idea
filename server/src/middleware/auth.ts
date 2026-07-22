@@ -28,6 +28,7 @@ export async function requireAuth(req: AuthedRequest, res: Response, next: NextF
     const payload = jwt.verify(token, env.jwtSecret) as TokenPayload;
     const business = await prisma.business.findUnique({ where: { id: payload.sub } });
     if (!business) return res.status(401).json({ error: 'Invalid token' });
+    if (business.suspended) return res.status(403).json({ error: 'This account has been suspended' });
     req.businessId = business.id;
     req.memberId = payload.mid ?? null;
     next();
@@ -49,7 +50,7 @@ export async function optionalAuth(req: AuthedRequest, _res: Response, next: Nex
     try {
       const payload = jwt.verify(token, env.jwtSecret) as TokenPayload;
       const business = await prisma.business.findUnique({ where: { id: payload.sub } });
-      if (business) {
+      if (business && !business.suspended) {
         req.businessId = business.id;
         req.memberId = payload.mid ?? null;
       }

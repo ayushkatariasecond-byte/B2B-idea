@@ -869,4 +869,100 @@ describe('Verve API', () => {
     const dominantTotal = dominantPostIds.filter((id) => allIds.includes(id)).length;
     expect(dominantTotal).toBe(5);
   });
+
+  // --- Content moderation ---
+
+  it('auto-hides a post once enough distinct businesses report it', async () => {
+    const author = await signup('modautohideauthor');
+    const post = await createPost(author.token, { caption: 'A post about to get reported' });
+    const postId = post.body.post.id;
+
+    const reporters = await Promise.all([
+      signup('modautohiderep1'),
+      signup('modautohiderep2'),
+      signup('modautohiderep3'),
+    ]);
+    for (const reporter of reporters) {
+      const res = await request(app)
+        .post('/reports')
+        .set('Authorization', `Bearer ${reporter.token}`)
+        .send({ targetType: 'post', targetId: postId, reason: 'Spam' });
+      expect(res.status).toBe(201);
+    }
+
+    const detailRes = await request(app).get(`/posts/${postId}`);
+    expect(detailRes.status).toBe(404);
+
+    const discoverRes = await request(app).get('/posts/discover');
+    expect(discoverRes.body.posts.some((p: { id: string }) => p.id === postId)).toBe(false);
+
+    // The author can still see their own hidden post.
+    const ownViewRes = await request(app).get(`/posts/${postId}`).set('Authorization', `Bearer ${author.token}`);
+    expect(ownViewRes.status).toBe(200);
+    expect(ownViewRes.body.post.hidden).toBe(true);
+  });
+
+  it('rejects non-admins from the moderation endpoints, and lets the admin list and resolve a report', async () => {
+    const author = await signup('modreviewauthor');
+    const post = await createPost(author.token, { caption: 'A borderline post' });
+    const postId = post.body.post.id;
+    const reporter = await signup('modreviewreporter');
+    const reportRes = await request(app)
+      .post('/reports')
+      .set('Authorization', `Bearer ${reporter.token}`)
+      .send({ targetType: 'post', targetId: postId, reason: 'Inappropriate' });
+    const reportId = reportRes.body.report.id;
+
+    const nonAdmin = await signup('modnonadmin');
+    const deniedRes = await request(app).get('/moderation/reports').set('Authorization', `Bearer ${nonAdmin.token}`);
+    expect(deniedRes.status).toBe(403);
+
+    const admin = await signup('admin');
+    const listRes = await request(app).get('/moderation/reports').set('Authorization', `Bearer ${admin.token}`);
+    expect(listRes.status).toBe(200);
+    const listed = listRes.body.reports.find((r: { id: string }) => r.id === reportId);
+    expect(listed.target.caption).toBe('A borderline post');
+
+    const resolveRes = await request(app)
+      .post(`/moderation/reports/${reportId}/resolve`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ action: 'hide' });
+    expect(resolveRes.status).toBe(200);
+
+    const discoverRes = await request(app).get('/posts/discover');
+    expect(discoverRes.body.posts.some((p: { id: string }) => p.id === postId)).toBe(false);
+  });
+
+  it('suspending a business hides its posts and blocks future logins', async () => {
+    const offender = await signup('modsuspendbiz');
+    const post = await createPost(offender.token, { caption: 'Post from a business about to be banned' });
+
+    // Reuses the admin account created in the previous test rather than signing up a
+    // second one — env.adminEmail is a single fixed address for the whole test run.
+    const adminLogin = await request(app).post('/auth/login').send({ email: 'admin@test.com', password: 'password123' });
+    expect(adminLogin.status).toBe(200);
+
+    const suspendRes = await request(app)
+      .post(`/moderation/businesses/${offender.business.id}/suspend`)
+      .set('Authorization', `Bearer ${adminLogin.body.token}`)
+      .send({ suspended: true });
+    expect(suspendRes.status).toBe(200);
+
+    const discoverRes = await request(app).get('/posts/discover');
+    expect(discoverRes.body.posts.some((p: { id: string }) => p.id === post.body.post.id)).toBe(false);
+
+    const loginRes = await request(app)
+      .post('/auth/login')
+      .send({ email: 'modsuspendbiz@test.com', password: 'password123' });
+    expect(loginRes.status).toBe(403);
+
+    const meRes = await request(app).get('/auth/me').set('Authorization', `Bearer ${offender.token}`);
+    expect(meRes.status).toBe(403);
+  });
+
+  it('rejects a post caption that matches the spam denylist', async () => {
+    const business = await signup('modspamauthor');
+    const res = await createPost(business.token, { caption: 'DM me now, buy followers cheap!' });
+    expect(res.status).toBe(400);
+  });
 });

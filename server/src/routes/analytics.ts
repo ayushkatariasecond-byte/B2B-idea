@@ -50,9 +50,12 @@ analyticsRouter.get('/me', requireAuth, async (req: AuthedRequest, res) => {
     ? Math.round(postScores.reduce((a, b) => a + b, 0) / postScores.length)
     : 50;
 
-  // Percentile vs every business that has at least one post.
+  // Percentile vs every business that has at least one post. Excludes hidden (moderated)
+  // posts so removed content can't skew what other businesses are benchmarked against —
+  // unlike myPosts above, which intentionally keeps the viewer's own hidden posts so their
+  // own dashboard stays accurate.
   const allBusinessPosts = await prisma.post.findMany({
-    where: visible,
+    where: { ...visible, hidden: false },
     include: { _count: { select: { likes: true, comments: true } } },
   });
   const scoreByBusiness = new Map<string, number[]>();

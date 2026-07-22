@@ -11,6 +11,7 @@ export const businessesRouter = Router();
 
 function visibilityWhere() {
   return {
+    hidden: false,
     OR: [{ status: 'published' }, { status: 'scheduled', scheduledFor: { lte: new Date() } }],
   };
 }

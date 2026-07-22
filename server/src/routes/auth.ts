@@ -65,6 +65,7 @@ authRouter.post('/login', async (req, res) => {
   if (business) {
     const ok = await bcrypt.compare(password, business.passwordHash);
     if (!ok) return res.status(401).json({ error: 'Invalid email or password' });
+    if (business.suspended) return res.status(403).json({ error: 'This account has been suspended' });
     const token = signToken(business.id, null);
     return res.json({ token, business: serializeBusiness(business) });
   }
@@ -78,6 +79,7 @@ authRouter.post('/login', async (req, res) => {
 
   const memberBusiness = await prisma.business.findUnique({ where: { id: member.businessId } });
   if (!memberBusiness) return res.status(401).json({ error: 'Invalid email or password' });
+  if (memberBusiness.suspended) return res.status(403).json({ error: 'This account has been suspended' });
 
   const token = signToken(memberBusiness.id, member.id);
   res.json({ token, business: serializeBusiness(memberBusiness), memberRole: member.role });

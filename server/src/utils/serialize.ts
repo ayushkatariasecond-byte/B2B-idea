@@ -43,6 +43,7 @@ type PostWithRelations = {
   shareCount: number;
   status: string;
   scheduledFor: Date | null;
+  hidden: boolean;
   createdAt: Date;
   _count: { likes: number; comments: number };
   likes?: { id: string }[];
@@ -78,6 +79,7 @@ export function serializePost(post: PostWithRelations) {
     savedByMe: Boolean(post.savedBy && post.savedBy.length > 0),
     status: post.status,
     scheduledFor: post.scheduledFor,
+    hidden: post.hidden,
     createdAt: post.createdAt,
   };
 }

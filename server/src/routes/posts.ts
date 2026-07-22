@@ -10,6 +10,7 @@ import { notify } from '../utils/notifications';
 import { transcodeVideo } from '../utils/videoTranscode';
 import { persistUpload } from '../storage';
 import { recencyBoost, velocityBoost, explorationJitter, currentHourBucket, diversify } from '../utils/ranking';
+import { containsBlockedContent } from '../utils/moderation';
 
 export const postsRouter = Router();
 
@@ -22,9 +23,10 @@ const postInclude = (viewerId?: string) => ({
 
 const PAGE_SIZE = 20;
 
-/** Only posts that are actually live: published, or scheduled posts whose time has arrived. */
+/** Only posts that are actually live: published (or due-scheduled), and not moderated away. */
 function visibilityWhere() {
   return {
+    hidden: false,
     OR: [{ status: 'published' }, { status: 'scheduled', scheduledFor: { lte: new Date() } }],
   };
 }
@@ -216,6 +218,9 @@ postsRouter.get('/:id', optionalAuth, async (req: AuthedRequest, res) => {
     include: postInclude(req.businessId),
   });
   if (!post) return res.status(404).json({ error: 'Post not found' });
+  if (post.hidden && post.businessId !== req.businessId) {
+    return res.status(404).json({ error: 'Post not found' });
+  }
   res.json({ post: serializePost(post) });
 });
 
@@ -239,6 +244,9 @@ const postUpload = upload.fields([
 postsRouter.post('/', requireAuth, postUpload, async (req: AuthedRequest, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' });
+  if (containsBlockedContent(parsed.data.caption)) {
+    return res.status(400).json({ error: 'This caption violates our content guidelines' });
+  }
 
   const files = req.files as { media?: Express.Multer.File[]; thumbnail?: Express.Multer.File[] } | undefined;
   const mediaFile = files?.media?.[0];
@@ -290,6 +298,9 @@ postsRouter.patch('/:id', requireAuth, async (req: AuthedRequest, res) => {
 
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' });
+  if (parsed.data.caption !== undefined && containsBlockedContent(parsed.data.caption)) {
+    return res.status(400).json({ error: 'This caption violates our content guidelines' });
+  }
 
   const post = await prisma.post.update({
     where: { id: existing.id },
@@ -361,7 +372,7 @@ postsRouter.get('/:id/comments', async (req, res) => {
   const post = await prisma.post.findUnique({ where: { id: req.params.id } });
   if (!post) return res.status(404).json({ error: 'Post not found' });
   const comments = await prisma.comment.findMany({
-    where: { postId: req.params.id },
+    where: { postId: req.params.id, hidden: false },
     orderBy: { createdAt: 'asc' },
     include: { business: true },
   });
@@ -378,6 +389,9 @@ postsRouter.get('/:id/comments', async (req, res) => {
 postsRouter.post('/:id/comments', requireAuth, async (req: AuthedRequest, res) => {
   const parsed = commentSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Comment text is required' });
+  if (containsBlockedContent(parsed.data.text)) {
+    return res.status(400).json({ error: 'This comment violates our content guidelines' });
+  }
   const post = await prisma.post.findUnique({ where: { id: req.params.id } });
   if (!post) return res.status(404).json({ error: 'Post not found' });
 
