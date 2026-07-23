@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -109,10 +109,39 @@ export function BusinessProfileContent({ business, posts, headerAction, moreActi
 
             {tab === 'about' && (
               <View style={styles.aboutWrap}>
-                <Text style={styles.aboutLabel}>Category</Text>
-                <Text style={styles.aboutValue}>{business.category}</Text>
+                <Text style={styles.aboutLabel}>{business.isRestaurant ? 'Cuisine' : 'Category'}</Text>
+                <Text style={styles.aboutValue}>{business.cuisine?.name ?? business.category}</Text>
+
+                {business.isRestaurant && business.city ? (
+                  <>
+                    <Text style={[styles.aboutLabel, { marginTop: 12 }]}>City</Text>
+                    <Text style={styles.aboutValue}>{business.city}</Text>
+                  </>
+                ) : null}
+
                 <Text style={[styles.aboutLabel, { marginTop: 12 }]}>About</Text>
                 <Text style={styles.aboutValue}>{business.bio || 'No description yet.'}</Text>
+
+                {business.isRestaurant && business.website ? (
+                  <Pressable onPress={() => Linking.openURL(business.website!)} accessibilityRole="link">
+                    <Text style={[styles.aboutValue, styles.websiteLink]}>{business.website}</Text>
+                  </Pressable>
+                ) : null}
+
+                {business.isRestaurant && business.menuItems.length > 0 && (
+                  <>
+                    <Text style={[styles.aboutLabel, { marginTop: 16 }]}>Menu</Text>
+                    {business.menuItems.map((item, i) => (
+                      <View key={`${item.name}-${i}`} style={styles.menuItemRow}>
+                        <View style={styles.menuItemHeader}>
+                          <Text style={styles.menuItemName}>{item.name}</Text>
+                          <Text style={styles.menuItemPrice}>${item.price.toFixed(2)}</Text>
+                        </View>
+                        {item.description ? <Text style={styles.menuItemDescription}>{item.description}</Text> : null}
+                      </View>
+                    ))}
+                  </>
+                )}
               </View>
             )}
           </View>
@@ -183,6 +212,12 @@ const styles = StyleSheet.create({
   aboutWrap: { paddingVertical: 16 },
   aboutLabel: { fontSize: 12, fontWeight: '700', color: colors.inkSoft, textTransform: 'uppercase', letterSpacing: 0.4, fontFamily: fonts.body.bold },
   aboutValue: { fontSize: 14, color: colors.captionText, marginTop: 4, lineHeight: 20, fontFamily: fonts.body.regular },
+  websiteLink: { color: colors.gold, marginTop: 8, fontFamily: fonts.body.semiBold },
+  menuItemRow: { marginTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.hairline },
+  menuItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  menuItemName: { fontSize: 14, color: colors.ink, fontFamily: fonts.body.bold },
+  menuItemPrice: { fontSize: 14, color: colors.ink, fontFamily: fonts.body.semiBold },
+  menuItemDescription: { fontSize: 13, color: colors.inkSoft, marginTop: 2, fontFamily: fonts.body.regular },
   tile: { flex: 1, aspectRatio: 0.75, overflow: 'hidden', backgroundColor: colors.surfaceMuted2 },
   tileMediaFallback: { backgroundColor: colors.surfaceMuted2 },
   emptyGrid: { textAlign: 'center', color: colors.inkFaint, marginTop: 24, fontFamily: fonts.body.medium },

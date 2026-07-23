@@ -56,7 +56,7 @@ export function ResetPasswordScreen({ navigation, route }: Props) {
           </>
         ) : (
           <>
-            <Text style={styles.subtitle}>Choose a new password for your Verve account.</Text>
+            <Text style={styles.subtitle}>Choose a new password for your Nibbler account.</Text>
             <View style={styles.form}>
               <TextField label="New password" placeholder="At least 8 characters" value={password} onChangeText={setPassword} secureTextEntry />
               <TextField label="Confirm password" placeholder="Re-enter password" value={confirm} onChangeText={setConfirm} secureTextEntry />

@@ -56,7 +56,7 @@ export function SplashScreen({ onDone }: Props) {
   };
 
   return (
-    <Pressable style={styles.container} onPress={onDone} accessibilityRole="button" accessibilityLabel="Tap to enter Verve">
+    <Pressable style={styles.container} onPress={onDone} accessibilityRole="button" accessibilityLabel="Tap to enter Nibbler">
       <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
         <Defs>
           <RadialGradient id="bg" cx="30%" cy="20%" r="75%">
@@ -99,7 +99,7 @@ export function SplashScreen({ onDone }: Props) {
 
       <Animated.View style={[styles.content, { opacity: fade, transform: [{ translateY: slide }] }]}>
         <Text style={styles.wordmark}>
-          verve<Text style={styles.wordmarkDot}>.</Text>
+          nibbler<Text style={styles.wordmarkDot}>.</Text>
         </Text>
         <LinearGradient
           colors={['transparent', colors.splashGlow1, 'transparent']}
@@ -107,8 +107,8 @@ export function SplashScreen({ onDone }: Props) {
           end={{ x: 1, y: 0 }}
           style={styles.divider}
         />
-        <Text style={styles.headline}>Keep scrolling. Your next favorite vendor is one post away.</Text>
-        <Text style={styles.subhead}>Real products, real teams, no boring decks.</Text>
+        <Text style={styles.headline}>Keep scrolling. Your next favorite meal is one video away.</Text>
+        <Text style={styles.subhead}>Real restaurants, real food, right in your city.</Text>
       </Animated.View>
 
       <Animated.View style={[styles.ctaWrap, { opacity: ctaFade }]}>
@@ -118,7 +118,7 @@ export function SplashScreen({ onDone }: Props) {
           end={{ x: 1, y: 1 }}
           style={styles.ctaPill}
         >
-          <Text style={styles.ctaText}>Tap to enter Verve</Text>
+          <Text style={styles.ctaText}>Tap to enter Nibbler</Text>
           <Icon name="arrowRight" color={colors.white} size={14} />
         </LinearGradient>
       </Animated.View>

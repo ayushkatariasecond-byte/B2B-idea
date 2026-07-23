@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { api } from './client';
-import { Business, Post } from './types';
+import { Business, Cuisine, MenuItem, Post } from './types';
 
 export function getBusiness(id: string) {
   return api.get<{ business: Business }>(`/businesses/${id}`);
@@ -10,8 +10,20 @@ export function getBusinessByHandle(handle: string) {
   return api.get<{ business: Business }>(`/businesses/handle/${handle}`);
 }
 
-export function updateMe(input: { name?: string; category?: string; bio?: string }) {
+export function updateMe(input: {
+  name?: string;
+  category?: string;
+  bio?: string;
+  city?: string;
+  website?: string;
+  cuisineSlug?: string;
+  menuItems?: MenuItem[];
+}) {
   return api.patch<{ business: Business }>('/businesses/me', input);
+}
+
+export function getCuisines() {
+  return api.get<{ cuisines: Cuisine[] }>('/cuisines');
 }
 
 async function uploadImage(path: string, input: { uri: string; fileName: string; mimeType: string }) {

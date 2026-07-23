@@ -1,3 +1,15 @@
+export interface Cuisine {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface MenuItem {
+  name: string;
+  price: number;
+  description?: string;
+}
+
 export interface Business {
   id: string;
   name: string;
@@ -14,6 +26,11 @@ export interface Business {
   followingCount?: number;
   isFollowedByMe?: boolean;
   isMe?: boolean;
+  city: string;
+  isRestaurant: boolean;
+  website: string | null;
+  cuisine: Cuisine | null;
+  menuItems: MenuItem[];
 }
 
 export type PostStatus = 'draft' | 'scheduled' | 'published';
@@ -121,4 +138,6 @@ export interface CreatedStory {
   expiresAt: string;
 }
 
-export const POST_TAGS = ['Product Launch', 'Culture', 'Case Study', 'Behind the Build', 'Customer Story'];
+// Nibbler: only restaurants post here, so these replace the old B2B tag set entirely
+// rather than living alongside it.
+export const POST_TAGS = ['New Dish', 'Behind the Kitchen', 'Special Offer', 'Customer Favorite'];

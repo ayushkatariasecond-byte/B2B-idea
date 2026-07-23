@@ -33,20 +33,20 @@ export function OnboardingScreen({ navigation }: Props) {
         end={{ x: 1, y: 1 }}
         style={styles.decorCardFront}
       >
-        <Text style={styles.decorText}>96 creativity score</Text>
+        <Text style={styles.decorText}>Trending near you</Text>
       </LinearGradient>
 
       <View style={styles.headlineWrap}>
         <Text style={styles.headline}>
-          B2B marketing{'\n'}that isn&apos;t boring.
+          See what&apos;s cooking{'\n'}in your city.
         </Text>
-        <Text style={styles.subhead}>A feed built for business buyers — where creative posts get seen, not suppressed.</Text>
+        <Text style={styles.subhead}>Short videos from real restaurants near you — before you decide where to eat.</Text>
       </View>
 
       <View style={styles.spacer} />
 
       <View style={styles.ctaWrap}>
-        <PrimaryButton label="Create your business page" onPress={() => navigation.navigate('Signup')} />
+        <PrimaryButton label="I run a restaurant" onPress={() => navigation.navigate('Signup')} />
         <PrimaryButton label="I already have an account" variant="ghost" onPress={() => navigation.navigate('Login')} />
         <PrimaryButton label="Look around as a guest" variant="ghost" loading={guestLoading} onPress={onGuest} />
       </View>

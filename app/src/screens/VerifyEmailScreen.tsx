@@ -43,7 +43,7 @@ export function VerifyEmailScreen({ navigation, route }: Props) {
             <Icon name="checkBadge" size={40} color={colors.gold} />
           </View>
           <Text style={styles.title}>Email confirmed</Text>
-          <Text style={styles.subtitle}>Your Verve email is verified. You're all set.</Text>
+          <Text style={styles.subtitle}>Your Nibbler email is verified. You're all set.</Text>
           <PrimaryButton label="Continue" onPress={onContinue} style={styles.submit} />
         </>
       )}

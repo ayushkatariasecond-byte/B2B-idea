@@ -7,7 +7,17 @@ export interface AuthResponse {
   memberRole?: string;
 }
 
-export function signup(input: { email: string; password: string; name: string; handle: string; category: string; bio?: string }) {
+export function signup(input: {
+  email: string;
+  password: string;
+  name: string;
+  handle: string;
+  city: string;
+  bio?: string;
+  isRestaurant?: boolean;
+  cuisineSlug?: string;
+  category?: string;
+}) {
   return api.post<AuthResponse>('/auth/signup', input);
 }
 

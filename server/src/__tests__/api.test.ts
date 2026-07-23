@@ -6,14 +6,25 @@ import { prisma } from '../db';
 import { UPLOAD_DIR } from '../upload';
 import { makeResetToken, makeVerifyToken } from '../authTokens';
 
-async function signup(handle: string) {
-  const res = await request(app).post('/auth/signup').send({
-    email: `${handle}@test.com`,
-    password: 'password123',
-    name: `${handle} Inc`,
-    handle,
-    category: 'Testing',
-  });
+// Nibbler's For You feed hard-filters to same-city restaurants, and virtually every
+// existing test signs up a business purely to post content and then check the feed — so
+// the default here is a restaurant in a fixed shared test city. Tests that specifically
+// care about city-locking, cuisine filtering, or plain (non-posting) viewer accounts pass
+// explicit overrides.
+async function signup(handle: string, overrides: Partial<{ city: string; isRestaurant: boolean; cuisineSlug: string }> = {}) {
+  const res = await request(app)
+    .post('/auth/signup')
+    .send({
+      email: `${handle}@test.com`,
+      password: 'password123',
+      name: `${handle} Inc`,
+      handle,
+      category: 'Testing',
+      city: 'Testville',
+      isRestaurant: true,
+      cuisineSlug: 'other',
+      ...overrides,
+    });
   return res.body as { token: string; business: { id: string } };
 }
 
@@ -75,12 +86,12 @@ describe('Verve API', () => {
     await signup('dupe');
     const dupeEmail = await request(app)
       .post('/auth/signup')
-      .send({ email: 'dupe@test.com', password: 'password123', name: 'Other', handle: 'dupeother', category: 'Testing' });
+      .send({ email: 'dupe@test.com', password: 'password123', name: 'Other', handle: 'dupeother', category: 'Testing', city: 'Testville' });
     expect(dupeEmail.status).toBe(409);
 
     const dupeHandle = await request(app)
       .post('/auth/signup')
-      .send({ email: 'other@test.com', password: 'password123', name: 'Other', handle: 'dupe', category: 'Testing' });
+      .send({ email: 'other@test.com', password: 'password123', name: 'Other', handle: 'dupe', category: 'Testing', city: 'Testville' });
     expect(dupeHandle.status).toBe(409);
   });
 
@@ -646,6 +657,7 @@ describe('Verve API', () => {
       name: 'Mixed Case Inc',
       handle: 'mixedcase',
       category: 'Testing',
+      city: 'Testville',
     });
     expect(signupRes.status).toBe(201);
     // Stored normalized, not as typed.
@@ -664,6 +676,7 @@ describe('Verve API', () => {
       name: 'Dupe Inc',
       handle: 'mixedcasedupe',
       category: 'Testing',
+      city: 'Testville',
     });
     expect(dupeRes.status).toBe(409);
   });
@@ -859,13 +872,13 @@ describe('Verve API', () => {
       await createPost(booster.token, { caption: 'A normal post from another business', tag: 'Culture' });
     }
 
-    const feedRes = await request(app).get('/posts/feed?tab=forYou');
+    const feedRes = await request(app).get('/posts/feed?tab=forYou').set('Authorization', `Bearer ${dominant.token}`);
     expect(feedRes.status).toBe(200);
     const dominantOnPage = feedRes.body.posts.filter((p: { businessId: string }) => p.businessId === dominant.business.id);
     expect(dominantOnPage.length).toBeLessThanOrEqual(3);
 
     // The cap reorders, it doesn't drop — all 5 posts must still be reachable across pages.
-    const allIds = await fetchForYouOrder();
+    const allIds = await fetchForYouOrder(dominant.token);
     const dominantTotal = dominantPostIds.filter((id) => allIds.includes(id)).length;
     expect(dominantTotal).toBe(5);
   });
@@ -964,5 +977,154 @@ describe('Verve API', () => {
     const business = await signup('modspamauthor');
     const res = await createPost(business.token, { caption: 'DM me now, buy followers cheap!' });
     expect(res.status).toBe(400);
+  });
+
+  // --- Nibbler: city-locked restaurant directory ---
+
+  it('lists the fixed cuisine taxonomy', async () => {
+    const res = await request(app).get('/cuisines');
+    expect(res.status).toBe(200);
+    const names = res.body.cuisines.map((c: { name: string }) => c.name);
+    expect(names).toEqual(expect.arrayContaining(['Italian', 'Thai', 'Mexican']));
+  });
+
+  it('requires a cuisine for a restaurant signup, and rejects an unknown cuisine slug', async () => {
+    const missingCuisine = await request(app).post('/auth/signup').send({
+      email: 'norest@test.com',
+      password: 'password123',
+      name: 'No Cuisine',
+      handle: 'norestcuisine',
+      city: 'Testville',
+      isRestaurant: true,
+    });
+    expect(missingCuisine.status).toBe(400);
+
+    const badCuisine = await request(app).post('/auth/signup').send({
+      email: 'badcuisine@test.com',
+      password: 'password123',
+      name: 'Bad Cuisine',
+      handle: 'badcuisine',
+      city: 'Testville',
+      isRestaurant: true,
+      cuisineSlug: 'not-a-real-cuisine',
+    });
+    expect(badCuisine.status).toBe(400);
+  });
+
+  it('derives category from the chosen cuisine on a restaurant signup', async () => {
+    const res = await signup('cuisinecategory', { cuisineSlug: 'thai' });
+    expect(res.business).toMatchObject({ category: 'Thai' });
+  });
+
+  it('signs up a plain (non-restaurant) viewer account without requiring a cuisine', async () => {
+    const res = await signup('plainviewer', { isRestaurant: false });
+    expect(res.business).toMatchObject({ isRestaurant: false, city: 'Testville' });
+  });
+
+  it('requires login to view the city-locked For You feed', async () => {
+    const res = await request(app).get('/posts/feed?tab=forYou');
+    expect(res.status).toBe(401);
+  });
+
+  it('never shows a viewer posts from a restaurant in a different city, in either direction', async () => {
+    const cityA = await signup('cityarest', { city: 'Springfield' });
+    const cityB = await signup('citybrest', { city: 'Shelbyville' });
+    await createPost(cityA.token, { caption: 'Only Springfield should see this' });
+    await createPost(cityB.token, { caption: 'Only Shelbyville should see this' });
+
+    const viewerA = await signup('cityaviewer', { city: 'Springfield', isRestaurant: false });
+    const viewerB = await signup('citybviewer', { city: 'Shelbyville', isRestaurant: false });
+
+    const feedA = await request(app).get('/posts/feed?tab=forYou').set('Authorization', `Bearer ${viewerA.token}`);
+    const namesA = feedA.body.posts.map((p: { caption: string }) => p.caption);
+    expect(namesA).toContain('Only Springfield should see this');
+    expect(namesA).not.toContain('Only Shelbyville should see this');
+
+    const feedB = await request(app).get('/posts/feed?tab=forYou').set('Authorization', `Bearer ${viewerB.token}`);
+    const namesB = feedB.body.posts.map((p: { caption: string }) => p.caption);
+    expect(namesB).toContain('Only Shelbyville should see this');
+    expect(namesB).not.toContain('Only Springfield should see this');
+  });
+
+  it('shows an empty feed (not a fallback to other cities) when the viewer\'s city has zero restaurants', async () => {
+    const viewer = await signup('emptycityviewer', { city: 'Nowheresville', isRestaurant: false });
+    const res = await request(app).get('/posts/feed?tab=forYou').set('Authorization', `Bearer ${viewer.token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.posts).toEqual([]);
+    expect(res.body.hasMore).toBe(false);
+    expect(res.body.city).toBe('Nowheresville');
+  });
+
+  it('filters the feed by cuisine within the viewer\'s own city', async () => {
+    const italian = await signup('cuisinefilteritalian', { city: 'Ogdenville', cuisineSlug: 'italian' });
+    const mexican = await signup('cuisinefiltermexican', { city: 'Ogdenville', cuisineSlug: 'mexican' });
+    await createPost(italian.token, { caption: 'Fresh pasta tonight' });
+    await createPost(mexican.token, { caption: 'Tacos al pastor' });
+
+    const viewer = await signup('cuisinefilterviewer', { city: 'Ogdenville', isRestaurant: false });
+    const res = await request(app)
+      .get('/posts/feed?tab=forYou&cuisine=italian')
+      .set('Authorization', `Bearer ${viewer.token}`);
+    expect(res.status).toBe(200);
+    const captions = res.body.posts.map((p: { caption: string }) => p.caption);
+    expect(captions).toContain('Fresh pasta tonight');
+    expect(captions).not.toContain('Tacos al pastor');
+  });
+
+  it('rejects an unknown cuisine slug in the feed filter', async () => {
+    const viewer = await signup('badcuisinefilterviewer');
+    const res = await request(app)
+      .get('/posts/feed?tab=forYou&cuisine=not-a-real-cuisine')
+      .set('Authorization', `Bearer ${viewer.token}`);
+    expect(res.status).toBe(400);
+  });
+
+  it('updates a restaurant profile: city, website, menu, and cuisine (which re-derives category)', async () => {
+    const { token } = await signup('menueditor', { cuisineSlug: 'american' });
+    const res = await request(app)
+      .patch('/businesses/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        city: 'New Cityville',
+        website: 'https://example.com/menu',
+        cuisineSlug: 'japanese',
+        menuItems: [{ name: 'Ramen', price: 14.5, description: 'Tonkotsu broth' }, { name: 'Gyoza', price: 8 }],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.business).toMatchObject({
+      city: 'New Cityville',
+      website: 'https://example.com/menu',
+      category: 'Japanese',
+    });
+    expect(res.body.business.cuisine).toMatchObject({ slug: 'japanese' });
+    expect(res.body.business.menuItems).toHaveLength(2);
+    expect(res.body.business.menuItems[0]).toMatchObject({ name: 'Ramen', price: 14.5 });
+  });
+
+  it('rejects a profile update with an unknown cuisine slug', async () => {
+    const { token } = await signup('badcuisineupdate');
+    const res = await request(app)
+      .patch('/businesses/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ cuisineSlug: 'not-a-real-cuisine' });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns cuisine, city, website, and menu on a restaurant\'s public profile', async () => {
+    const { token } = await signup('publicprofilerest', { city: 'Publictown', cuisineSlug: 'indian' });
+    await request(app)
+      .patch('/businesses/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ website: 'https://example.com/curry', menuItems: [{ name: 'Butter Chicken', price: 15 }] });
+
+    const res = await request(app).get('/businesses/handle/publicprofilerest');
+    expect(res.status).toBe(200);
+    expect(res.body.business).toMatchObject({
+      city: 'Publictown',
+      isRestaurant: true,
+      website: 'https://example.com/curry',
+    });
+    expect(res.body.business.cuisine).toMatchObject({ name: 'Indian', slug: 'indian' });
+    expect(res.body.business.menuItems).toEqual([{ name: 'Butter Chicken', price: 15 }]);
   });
 });

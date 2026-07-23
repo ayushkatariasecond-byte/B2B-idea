@@ -31,7 +31,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   } catch {
     // fetch only throws like this when the server can't be reached at all (not running,
     // wrong URL, network down). Status 0 signals "server unreachable" to the screens.
-    throw new ApiError(0, "Can't reach the Verve server. Make sure the backend is running — run `npm run dev` in the server folder.");
+    throw new ApiError(0, "Can't reach the Nibbler server. Make sure the backend is running — run `npm run dev` in the server folder.");
   }
   const contentType = res.headers.get('content-type') || '';
   const data = contentType.includes('application/json') ? await res.json() : undefined;

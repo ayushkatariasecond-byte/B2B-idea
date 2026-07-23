@@ -1,5 +1,7 @@
 import { computeCreativityScore, TRENDING_THRESHOLD } from './score';
 
+type CuisineLike = { id: string; name: string; slug: string };
+
 type BusinessLike = {
   id: string;
   name: string;
@@ -12,6 +14,11 @@ type BusinessLike = {
   verificationRequested: boolean;
   emailVerified?: boolean;
   createdAt: Date;
+  city?: string;
+  isRestaurant?: boolean;
+  website?: string | null;
+  cuisine?: CuisineLike | null;
+  menuItems?: unknown;
 };
 
 export function serializeBusiness(b: BusinessLike, extra: Record<string, unknown> = {}) {
@@ -27,6 +34,11 @@ export function serializeBusiness(b: BusinessLike, extra: Record<string, unknown
     verificationRequested: b.verificationRequested,
     emailVerified: b.emailVerified ?? false,
     createdAt: b.createdAt,
+    city: b.city ?? '',
+    isRestaurant: b.isRestaurant ?? false,
+    website: b.website ?? null,
+    cuisine: b.cuisine ?? null,
+    menuItems: Array.isArray(b.menuItems) ? b.menuItems : [],
     ...extra,
   };
 }

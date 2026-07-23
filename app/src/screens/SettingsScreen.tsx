@@ -30,11 +30,11 @@ export function SettingsScreen({ navigation }: Props) {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = 'verve-data-export.json';
+        link.download = 'nibbler-data-export.json';
         link.click();
         URL.revokeObjectURL(url);
       } else {
-        await Share.share({ message: json, title: 'Verve data export' });
+        await Share.share({ message: json, title: 'Nibbler data export' });
       }
     } catch {
       alert('Couldn’t export data', 'Please try again.');

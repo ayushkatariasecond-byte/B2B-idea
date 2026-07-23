@@ -8,9 +8,11 @@ import { FeedPostCard } from '../components/FeedPostCard';
 import { StoryTray } from '../components/StoryTray';
 import { BottomNav } from '../components/BottomNav';
 import { Icon } from '../components/Icon';
+import { Chip } from '../components/Chip';
 import { colors, fonts } from '../theme/tokens';
-import { Post } from '../api/types';
+import { Cuisine, Post } from '../api/types';
 import * as postsApi from '../api/posts';
+import * as businessesApi from '../api/businesses';
 import { ApiError } from '../api/client';
 import { RootStackParamList } from '../navigation/types';
 
@@ -25,22 +27,32 @@ export function HomeFeedScreen() {
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [activePostId, setActivePostId] = useState<string | null>(null);
+  const [feedCity, setFeedCity] = useState<string | null>(null);
+  const [cuisines, setCuisines] = useState<Cuisine[]>([]);
+  const [cuisineSlug, setCuisineSlug] = useState<string | null>(null);
   const viewedRef = useRef(new Set<string>());
 
-  const load = useCallback(async (activeTab: FeedTab, isRefresh = false) => {
+  useEffect(() => {
+    businessesApi.getCuisines().then((res) => setCuisines(res.cuisines));
+  }, []);
+
+  const load = useCallback(async (activeTab: FeedTab, activeCuisine: string | null, isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     setError(null);
     try {
-      const res = await postsApi.getFeed(activeTab);
+      const res = await postsApi.getFeed(activeTab, 1, activeTab === 'forYou' ? activeCuisine ?? undefined : undefined);
       setPosts(res.posts);
       setHasMore(res.hasMore);
       setActivePostId(res.posts[0]?.id ?? null);
+      setFeedCity(res.city ?? null);
     } catch (e) {
       if (e instanceof ApiError && e.status === 0) {
         setError(e.message);
       } else if (e instanceof ApiError && e.status === 401 && activeTab === 'following') {
         setError('Log in to see posts from businesses you follow.');
+      } else if (e instanceof ApiError && e.status === 401) {
+        setError('Log in to see your city’s feed.');
       } else {
         setError("Couldn't load your feed. Check your connection and try again.");
       }
@@ -53,8 +65,8 @@ export function HomeFeedScreen() {
   }, []);
 
   useEffect(() => {
-    load(tab);
-  }, [tab, load]);
+    load(tab, cuisineSlug);
+  }, [tab, cuisineSlug, load]);
 
   const handleToggleLike = useCallback(async (post: Post) => {
     setPosts((prev) =>
@@ -103,7 +115,7 @@ export function HomeFeedScreen() {
       <SafeAreaView edges={['top']} style={styles.topBarSafe}>
         <View style={styles.topBar}>
           <Text style={styles.wordmark}>
-            verve<Text style={styles.wordmarkDot}>.</Text>
+            nibbler<Text style={styles.wordmarkDot}>.</Text>
           </Text>
           <View style={styles.headerIcons}>
             <Pressable
@@ -155,6 +167,20 @@ export function HomeFeedScreen() {
         </Pressable>
       </View>
 
+      {tab === 'forYou' && cuisines.length > 0 && (
+        <FlatList
+          horizontal
+          data={cuisines}
+          keyExtractor={(item) => item.id}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.cuisineRow}
+          renderItem={({ item }) => (
+            <Chip label={item.name} active={cuisineSlug === item.slug} onPress={() => setCuisineSlug(cuisineSlug === item.slug ? null : item.slug)} />
+          )}
+          ListHeaderComponent={<Chip label="All" active={cuisineSlug === null} onPress={() => setCuisineSlug(null)} />}
+        />
+      )}
+
       <StoryTray />
     </View>
   );
@@ -162,6 +188,9 @@ export function HomeFeedScreen() {
   const endOfFeed = !hasMore ? (
     <Text style={styles.endFeedText}>YOU'RE ALL CAUGHT UP</Text>
   ) : null;
+
+  const emptyMessage =
+    error ?? (tab === 'forYou' && feedCity ? `No restaurants in ${feedCity} yet.` : "Nothing here yet — follow a few businesses to fill this feed.");
 
   return (
     <View style={styles.container}>
@@ -173,9 +202,9 @@ export function HomeFeedScreen() {
       ) : posts.length === 0 ? (
         <View style={styles.center}>
           {header}
-          <Text style={styles.emptyText}>{error ?? "Nothing here yet — follow a few businesses to fill this feed."}</Text>
+          <Text style={styles.emptyText}>{emptyMessage}</Text>
           {error && (
-            <Pressable onPress={() => load(tab)} hitSlop={10} accessibilityRole="button">
+            <Pressable onPress={() => load(tab, cuisineSlug)} hitSlop={10} accessibilityRole="button">
               <Text style={styles.retryText}>Try again</Text>
             </Pressable>
           )}
@@ -200,7 +229,7 @@ export function HomeFeedScreen() {
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
           refreshing={refreshing}
-          onRefresh={() => load(tab, true)}
+          onRefresh={() => load(tab, cuisineSlug, true)}
         />
       )}
 
@@ -237,6 +266,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.hairline,
   },
   tabItem: { alignItems: 'center' },
+  cuisineRow: { gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
   tabLabel: { fontFamily: fonts.display.semiBold, fontSize: 15 },
   tabLabelActive: { color: colors.ink, fontFamily: fonts.display.bold },
   tabLabelInactive: { color: colors.inkFaint, fontFamily: fonts.display.semiBold },

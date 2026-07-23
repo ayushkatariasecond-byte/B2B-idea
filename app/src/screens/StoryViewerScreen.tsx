@@ -151,7 +151,7 @@ export function StoryViewerScreen({ route, navigation }: Props) {
 
   const handleShare = async () => {
     try {
-      await Share.share({ message: `${group.business.name}'s story on Verve` });
+      await Share.share({ message: `${group.business.name}'s story on Nibbler` });
     } catch {
       // user dismissed share sheet; nothing to do
     }

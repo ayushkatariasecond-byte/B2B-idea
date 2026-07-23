@@ -64,17 +64,42 @@ postsRouter.get('/feed', optionalAuth, async (req: AuthedRequest, res) => {
     return res.json({ posts: posts.map(serializePost), page, hasMore: posts.length === PAGE_SIZE });
   }
 
+  // Nibbler: city-lock is a hard, non-negotiable pre-filter — it has to be a WHERE
+  // clause the candidate pool is fetched with, never a post-hoc JS filter or a ranking
+  // signal, so a post from another city is never even in `all` for the scoring below to
+  // see. Requires a known viewer (their city), so — same as the Following tab just above
+  // — an anonymous request is rejected rather than served an undefined-city feed.
+  if (!req.businessId) return res.status(401).json({ error: 'Login required to see your city’s feed' });
+  const viewer = await prisma.business.findUnique({ where: { id: req.businessId }, select: { city: true } });
+  const viewerCity = viewer?.city ?? '';
+
+  const cuisineSlug = typeof req.query.cuisine === 'string' ? req.query.cuisine : undefined;
+  let cuisineId: string | undefined;
+  if (cuisineSlug) {
+    const cuisine = await prisma.cuisine.findUnique({ where: { slug: cuisineSlug } });
+    if (!cuisine) return res.status(400).json({ error: 'Unknown cuisine type' });
+    cuisineId = cuisine.id;
+  }
+
   // For You: a bounded candidate pool (still recency-ordered so we don't do a full
   // table scan), then re-ranked by a real `finalScore` — see utils/ranking.ts for the
   // rationale behind each term. Personalization (follow/top-tag boosts) only applies
   // when the viewer is authenticated; anonymous viewers get the same ranking minus
   // those two terms, same as how the Following tab already gates on req.businessId.
   const all = await prisma.post.findMany({
-    where: { ...visibilityWhere(), businessId: { notIn: excluded } },
+    where: {
+      ...visibilityWhere(),
+      businessId: { notIn: excluded },
+      business: { isRestaurant: true, city: viewerCity, ...(cuisineId ? { cuisineId } : {}) },
+    },
     orderBy: { createdAt: 'desc' },
     take: 300,
     include: postInclude(req.businessId),
   });
+
+  if (all.length === 0) {
+    return res.json({ posts: [], page, hasMore: false, city: viewerCity });
+  }
 
   // Personalization signals — both are skipped entirely (left as empty/undefined) for
   // anonymous requests, matching the optionalAuth pattern used throughout this route.
@@ -135,7 +160,7 @@ postsRouter.get('/feed', optionalAuth, async (req: AuthedRequest, res) => {
   ranked.sort((a, b) => b.finalScore - a.finalScore || (b.createdAt > a.createdAt ? 1 : -1));
   const diversified = diversify(ranked, 3, PAGE_SIZE);
   const pageItems = diversified.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(({ finalScore, ...post }) => post);
-  res.json({ posts: pageItems, page, hasMore: page * PAGE_SIZE < diversified.length });
+  res.json({ posts: pageItems, page, hasMore: page * PAGE_SIZE < diversified.length, city: viewerCity });
 });
 
 postsRouter.get('/discover', optionalAuth, async (req: AuthedRequest, res) => {

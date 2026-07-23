@@ -42,16 +42,16 @@ const FACE_STOPS = ['#f8e08a', '#e3b842', '#c58300', '#7c5300'];
 const BACK_STOPS = ['#f2d377', '#dcae3c', '#b87a00', '#6f4a00'];
 
 const CALLOUTS: { label: string; icon: IconName }[] = [
-  { label: 'Real engagement, ranked live', icon: 'barChart' },
-  { label: 'Teams & scheduling', icon: 'mail' },
-  { label: 'Notifications that matter', icon: 'checkBadge' },
+  { label: 'Real videos from real kitchens', icon: 'barChart' },
+  { label: 'Locked to your city', icon: 'checkBadge' },
+  { label: 'Find it, then go eat it', icon: 'mail' },
 ];
 
 // Copy stages — hard swaps at the §3 thresholds. size in px (scaled to container width at render).
 const COPY_STAGES: { at: number; text: string; size: number }[] = [
-  { at: 0, text: 'MAKE NOISE.', size: 112 },
-  { at: 0.18, text: 'A NEW ANGLE ON REACH', size: 56 },
-  { at: 0.38, text: 'EVERY POST COUNTS', size: 60 },
+  { at: 0, text: 'GET HUNGRY.', size: 112 },
+  { at: 0.18, text: 'A NEW WAY TO FIND FOOD', size: 56 },
+  { at: 0.38, text: 'EVERY BITE COUNTS', size: 60 },
   { at: 0.55, text: '', size: 60 },
   { at: 0.78, text: 'YOUR FEED.', size: 72 },
 ];
@@ -332,11 +332,8 @@ export function ReopenIntro({ onDone }: Props) {
           {/* Nav bar that fades in as the coin docks into it. */}
           <Animated.View style={[styles.nav, { opacity: anim.navOpacity }]}>
             <Text style={styles.navWord}>
-              verve<Text style={{ color: colors.gradientGoldEnd }}>.</Text>
+              nibbler<Text style={{ color: colors.gradientGoldEnd }}>.</Text>
             </Text>
-            <LinearGradient colors={[colors.gradientGoldStart, colors.gradientGoldEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.navPill}>
-              <Text style={styles.navPillText}>96</Text>
-            </LinearGradient>
           </Animated.View>
 
           {/* Medallion group — centered, transforms in spec order. */}
@@ -360,8 +357,8 @@ export function ReopenIntro({ onDone }: Props) {
             >
               {/* Coin (takes the rotateX tumble) */}
               <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ perspective: 900 }, { rotateX: anim.rotateX }] }]}>
-                <CoinFace diameter={anim.COIN} opacity={anim.faceOpacity} stops={FACE_STOPS} glyph="V" />
-                <CoinFace diameter={anim.COIN} opacity={anim.backOpacity} stops={BACK_STOPS} glyph="96" sub="CREATIVITY" flipped />
+                <CoinFace diameter={anim.COIN} opacity={anim.faceOpacity} stops={FACE_STOPS} glyph="N" />
+                <CoinFace diameter={anim.COIN} opacity={anim.backOpacity} stops={BACK_STOPS} glyph="🍴" flipped />
               </Animated.View>
               {/* Edge bar — ignores rotateX (sibling of the coin, per spec §4) */}
               <Animated.View style={[styles.edge, { top: anim.COIN / 2 - 13, opacity: anim.edgeOpacity }]}>
@@ -464,8 +461,6 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   navWord: { fontFamily: fonts.display.bold, fontSize: 21, letterSpacing: -0.5, color: '#171308' },
-  navPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 13, borderRadius: 100 },
-  navPillText: { fontFamily: fonts.display.bold, fontSize: 13, color: '#ffffff' },
 
   medAnchor: { position: 'absolute', width: 0, height: 0 },
   coinFace: {

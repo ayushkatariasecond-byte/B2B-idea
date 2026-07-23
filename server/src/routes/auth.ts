@@ -11,25 +11,42 @@ import { makeResetToken, readResetSubject, verifyResetToken, makeVerifyToken, ve
 
 export const authRouter = Router();
 
-const signupSchema = z.object({
-  email: emailSchema,
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  name: z.string().min(2).max(80),
-  handle: z
-    .string()
-    .min(2)
-    .max(30)
-    .regex(/^[a-z0-9_]+$/, 'Handle can only contain lowercase letters, numbers, and underscores'),
-  category: z.string().min(2).max(60),
-  bio: z.string().max(280).optional().default(''),
-});
+// Nibbler: city is required for every account — it's what scopes a viewer's feed to
+// their own city. Restaurant accounts are a variant of this same signup flow (not a
+// separate endpoint): `isRestaurant: true` requires `cuisineSlug` and, rather than also
+// asking for a free-text `category` that would just restate the cuisine, derives
+// `category` from the chosen cuisine's name server-side.
+const signupSchema = z
+  .object({
+    email: emailSchema,
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+    name: z.string().min(2).max(80),
+    handle: z
+      .string()
+      .min(2)
+      .max(30)
+      .regex(/^[a-z0-9_]+$/, 'Handle can only contain lowercase letters, numbers, and underscores'),
+    city: z.string().min(1, 'City is required').max(80),
+    category: z.string().min(2).max(60).optional(),
+    bio: z.string().max(280).optional().default(''),
+    isRestaurant: z.boolean().optional().default(false),
+    cuisineSlug: z.string().min(1).optional(),
+  })
+  .refine((data) => data.isRestaurant === false || Boolean(data.cuisineSlug), {
+    message: 'Cuisine type is required for a restaurant account',
+    path: ['cuisineSlug'],
+  })
+  .refine((data) => data.isRestaurant === true || Boolean(data.category), {
+    message: 'Category is required',
+    path: ['category'],
+  });
 
 authRouter.post('/signup', async (req, res) => {
   const parsed = signupSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' });
   }
-  const { email, password, name, handle, category, bio } = parsed.data;
+  const { email, password, name, handle, city, bio, isRestaurant, cuisineSlug } = parsed.data;
 
   const existingEmail = await prisma.business.findUnique({ where: { email } });
   if (existingEmail) return res.status(409).json({ error: 'An account with this email already exists' });
@@ -37,9 +54,26 @@ authRouter.post('/signup', async (req, res) => {
   const existingHandle = await prisma.business.findUnique({ where: { handle } });
   if (existingHandle) return res.status(409).json({ error: 'That handle is already taken' });
 
+  let cuisine = null;
+  if (isRestaurant) {
+    cuisine = await prisma.cuisine.findUnique({ where: { slug: cuisineSlug! } });
+    if (!cuisine) return res.status(400).json({ error: 'Unknown cuisine type' });
+  }
+
   const passwordHash = await bcrypt.hash(password, 10);
   const business = await prisma.business.create({
-    data: { email, passwordHash, name, handle, category, bio },
+    data: {
+      email,
+      passwordHash,
+      name,
+      handle,
+      city,
+      bio,
+      isRestaurant,
+      category: isRestaurant ? cuisine!.name : parsed.data.category!,
+      cuisineId: cuisine?.id ?? null,
+    },
+    include: { cuisine: true },
   });
 
   const verifyUrl = `${env.appWebUrl}/verify-email?token=${makeVerifyToken(business.id)}`;
@@ -61,7 +95,7 @@ authRouter.post('/login', async (req, res) => {
   }
   const { email, password } = parsed.data;
 
-  const business = await prisma.business.findUnique({ where: { email } });
+  const business = await prisma.business.findUnique({ where: { email }, include: { cuisine: true } });
   if (business) {
     const ok = await bcrypt.compare(password, business.passwordHash);
     if (!ok) return res.status(401).json({ error: 'Invalid email or password' });
@@ -77,7 +111,7 @@ authRouter.post('/login', async (req, res) => {
   const ok = await bcrypt.compare(password, member.passwordHash);
   if (!ok) return res.status(401).json({ error: 'Invalid email or password' });
 
-  const memberBusiness = await prisma.business.findUnique({ where: { id: member.businessId } });
+  const memberBusiness = await prisma.business.findUnique({ where: { id: member.businessId }, include: { cuisine: true } });
   if (!memberBusiness) return res.status(401).json({ error: 'Invalid email or password' });
   if (memberBusiness.suspended) return res.status(403).json({ error: 'This account has been suspended' });
 
@@ -107,7 +141,7 @@ authRouter.post('/guest', async (_req, res) => {
 });
 
 authRouter.get('/me', requireAuth, async (req: AuthedRequest, res) => {
-  const business = await prisma.business.findUnique({ where: { id: req.businessId! } });
+  const business = await prisma.business.findUnique({ where: { id: req.businessId! }, include: { cuisine: true } });
   if (!business) return res.status(404).json({ error: 'Not found' });
   res.json({ business: serializeBusiness(business), isOwner: !req.memberId });
 });

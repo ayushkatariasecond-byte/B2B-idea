@@ -52,7 +52,7 @@ export function LoginScreen({ navigation }: Props) {
 
         <PrimaryButton label="Log in" onPress={submit} loading={loading} style={styles.submit} />
         <Text style={styles.switchText} onPress={() => navigation.navigate('Signup')}>
-          New to Verve? <Text style={styles.switchLink}>Create a page</Text>
+          New to Nibbler? <Text style={styles.switchLink}>Create a page</Text>
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>

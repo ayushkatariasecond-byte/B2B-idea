@@ -94,7 +94,7 @@ export function AnalyticsScreen({ navigation }: Props) {
               {data.creativityScore}
               <Text style={styles.scoreOutOf}> / 100</Text>
             </Text>
-            <Text style={styles.scorePercentile}>Top {data.percentileTop}% of businesses on Verve</Text>
+            <Text style={styles.scorePercentile}>Top {data.percentileTop}% of restaurants on Nibbler</Text>
           </View>
           <Svg width={62} height={62} viewBox="0 0 62 62">
             <Circle cx={31} cy={31} r={RING_RADIUS} fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth={6} />

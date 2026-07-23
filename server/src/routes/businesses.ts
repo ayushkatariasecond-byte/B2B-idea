@@ -17,7 +17,7 @@ function visibilityWhere() {
 }
 
 async function withStats(businessId: string, viewerId?: string) {
-  const business = await prisma.business.findUnique({ where: { id: businessId } });
+  const business = await prisma.business.findUnique({ where: { id: businessId }, include: { cuisine: true } });
   if (!business) return null;
 
   const [postCount, followerCount, followingCount, isFollowedByMe] = await Promise.all([
@@ -78,17 +78,45 @@ businessesRouter.get('/handle/:handle', optionalAuth, async (req: AuthedRequest,
   res.json({ business: result });
 });
 
+const menuItemSchema = z.object({
+  name: z.string().min(1).max(80),
+  price: z.number().nonnegative(),
+  description: z.string().max(200).optional(),
+});
+
 const updateSchema = z.object({
   name: z.string().min(2).max(80).optional(),
   category: z.string().min(2).max(60).optional(),
   bio: z.string().max(280).optional(),
+  city: z.string().min(1).max(80).optional(),
+  website: z.union([z.string().url().max(300), z.literal('')]).optional(),
+  cuisineSlug: z.string().min(1).optional(),
+  // Full-replace, matching the update-your-whole-menu-at-once pattern this route already
+  // uses elsewhere for small collections — no per-item CRUD endpoints for a flat list this size.
+  menuItems: z.array(menuItemSchema).max(100).optional(),
 });
 
 businessesRouter.patch('/me', requireAuth, async (req: AuthedRequest, res) => {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' });
+  const { cuisineSlug, website, ...rest } = parsed.data;
 
-  const business = await prisma.business.update({ where: { id: req.businessId! }, data: parsed.data });
+  let cuisineFields: { cuisineId: string; category: string } | undefined;
+  if (cuisineSlug) {
+    const cuisine = await prisma.cuisine.findUnique({ where: { slug: cuisineSlug } });
+    if (!cuisine) return res.status(400).json({ error: 'Unknown cuisine type' });
+    cuisineFields = { cuisineId: cuisine.id, category: cuisine.name };
+  }
+
+  const business = await prisma.business.update({
+    where: { id: req.businessId! },
+    data: {
+      ...rest,
+      ...(website !== undefined ? { website: website === '' ? null : website } : {}),
+      ...cuisineFields,
+    },
+    include: { cuisine: true },
+  });
   res.json({ business: serializeBusiness(business) });
 });
 

@@ -10,6 +10,7 @@ import { notificationsRouter } from './routes/notifications';
 import { reportsRouter } from './routes/reports';
 import { moderationRouter } from './routes/moderation';
 import { storiesRouter } from './routes/stories';
+import { cuisinesRouter } from './routes/cuisines';
 import { UPLOAD_DIR } from './upload';
 import { prisma } from './db';
 import { setupRealtime } from './realtime';
@@ -45,6 +46,7 @@ app.use('/notifications', notificationsRouter);
 app.use('/reports', reportsRouter);
 app.use('/moderation', moderationRouter);
 app.use('/stories', storiesRouter);
+app.use('/cuisines', cuisinesRouter);
 
 // Sentry's error handler captures exceptions before our own responds (no-op if disabled).
 if (sentryEnabled()) {

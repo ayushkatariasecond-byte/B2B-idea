@@ -181,7 +181,7 @@ export function ComposeScreen({ navigation }: Props) {
           <Text style={styles.fieldLabel}>Caption</Text>
           <TextInput
             style={styles.captionInput}
-            placeholder="We taught a warehouse arm to dance..."
+            placeholder="Fresh off the grill tonight..."
             placeholderTextColor={colors.inkMuted}
             value={caption}
             onChangeText={setCaption}

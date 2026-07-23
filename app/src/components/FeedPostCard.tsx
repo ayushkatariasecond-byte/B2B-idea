@@ -44,7 +44,7 @@ export function FeedPostCard({ post, isActive, onToggleLike, onToggleSave, onSha
   const handleShare = async () => {
     onShare(post);
     try {
-      await Share.share({ message: `${post.business.name} on Verve: ${post.caption}` });
+      await Share.share({ message: `${post.business.name} on Nibbler: ${post.caption}` });
     } catch {
       // user dismissed share sheet; nothing to do
     }

@@ -24,6 +24,20 @@ model Business {
   expoPushToken          String?
   createdAt              DateTime @default(now())
 
+  // Nibbler prototype: city-locked restaurant directory. `city` is required at the
+  // signup-validation layer for every account (restaurant or plain viewer) — it's what
+  // scopes a viewer's feed. `@default("")` only exists so this stays a safe additive
+  // migration; no real row should ever keep the empty default past signup.
+  city                   String   @default("")
+  isRestaurant           Boolean  @default(false)
+  website                String?
+  cuisineId              String?
+  cuisine                Cuisine? @relation(fields: [cuisineId], references: [id])
+  // Deliberately a JSON blob, not a MenuItem table: the spec calls for a flat list with
+  // no categories/sections, and a whole CRUD subsystem for that would be overkill for a
+  // one-night prototype. Shape: { name: string; price: number; description?: string }[].
+  menuItems              Json     @default("[]")
+
   posts           Post[]
   likes           Like[]
   comments        Comment[]
@@ -42,6 +56,19 @@ model Business {
   reportsFiled    Report[]
   stories         Story[]
   storyViews      StoryView[]
+
+  @@index([isRestaurant, city])
+}
+
+// Fixed cuisine taxonomy — a lookup table, not free text, so filtering/search stays
+// exact-match and cheap. One cuisine per restaurant (a single FK, not a join table like
+// the agency-directory's Service/Industry), since a restaurant picks one primary type.
+model Cuisine {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  slug      String     @unique
+
+  businesses Business[]
 }
 
 model BusinessMember {

@@ -2,8 +2,10 @@ import { Platform } from 'react-native';
 import { api } from './client';
 import { Comment, Post, PostStatus, TrendingTag } from './types';
 
-export function getFeed(tab: 'forYou' | 'following', page = 1) {
-  return api.get<{ posts: Post[]; page: number; hasMore: boolean }>(`/posts/feed?tab=${tab}&page=${page}`);
+export function getFeed(tab: 'forYou' | 'following', page = 1, cuisineSlug?: string) {
+  const search = new URLSearchParams({ tab, page: String(page) });
+  if (cuisineSlug) search.set('cuisine', cuisineSlug);
+  return api.get<{ posts: Post[]; page: number; hasMore: boolean; city?: string }>(`/posts/feed?${search.toString()}`);
 }
 
 export function discover(params: { tag?: string; q?: string; hashtag?: string }) {
