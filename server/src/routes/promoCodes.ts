@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db';
-import { requireAuth, optionalAuth, AuthedRequest } from '../middleware/auth';
+import { requireAuth, optionalAuth, rejectGuest, AuthedRequest } from '../middleware/auth';
 import { promoRedeemLimiter } from '../security';
 
 export const promoCodesRouter = Router();
@@ -28,7 +28,7 @@ const createSchema = z.object({
 // this is the minimum plumbing needed to make the requested feature actually work, not a
 // new feature in its own right. Restaurant-only, same ownership model as everything else
 // a business manages about itself.
-promoCodesRouter.post('/', requireAuth, async (req: AuthedRequest, res) => {
+promoCodesRouter.post('/', requireAuth, rejectGuest, async (req: AuthedRequest, res) => {
   const business = await prisma.business.findUnique({ where: { id: req.businessId! } });
   if (!business?.isRestaurant) {
     return res.status(403).json({ error: 'Only restaurant accounts can create promo codes' });

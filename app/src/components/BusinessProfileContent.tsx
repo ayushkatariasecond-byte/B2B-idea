@@ -14,6 +14,22 @@ import { Business, Post } from '../api/types';
 import { RootStackParamList } from '../navigation/types';
 
 /**
+ * Only http(s) links are ever handed to the OS/browser. The API already rejects other
+ * schemes on write and filters them on read, so this is the third layer — but it's the one
+ * that still holds if this link is ever rendered as a real `<a href>` instead of going
+ * through Linking, which is where a stored `javascript:` URL actually executes.
+ * `Linking.canOpenURL` is no help here: on react-native-web it returns true unconditionally.
+ */
+function isSafeWebUrl(value: string): boolean {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Opens a restaurant's ordering link and logs the click for their stats.
  *
  * The log is deliberately fire-and-forget and its failure is swallowed: this is the moment
@@ -21,6 +37,7 @@ import { RootStackParamList } from '../navigation/types';
  * rate-limited must never delay or block that. Worst case we undercount a click.
  */
 function openWebsite(businessId: string, url: string) {
+  if (!isSafeWebUrl(url)) return;
   void businessesApi.logLinkClick(businessId).catch(() => undefined);
   void Linking.openURL(url);
 }

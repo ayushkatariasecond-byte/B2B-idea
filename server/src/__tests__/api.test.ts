@@ -1450,7 +1450,25 @@ describe('Verve API', () => {
 
   it('accepts a post whose video is malformed (undecodable), falling back to the untranscoded original rather than rejecting it', async () => {
     const { token } = await signup('malformedvideo');
-    const garbage = Buffer.from('this is not a real video file, just bytes claiming to be one');
+    // A REAL MP4 container header (`ftyp` box, isom brand) followed by garbage, rather than
+    // the plain ASCII string this used to send. The point of this test is transcoder
+    // resilience — "ffmpeg couldn't decode it" must not fail the upload — and that needs a
+    // file which genuinely is an MP4 but is undecodable. The old fixture wasn't a video at
+    // all, so once uploads started verifying magic bytes (see upload.ts) it was really
+    // asserting that the API accepts arbitrary bytes wearing a video mimetype, which is the
+    // spoofed-Content-Type bypass itself. Both guarantees hold now: this still exercises the
+    // fallback path, and security.test.ts covers the rejection path it used to contradict.
+    const ftypBox = Buffer.from([
+      0x00, 0x00, 0x00, 0x20, // box size: 32
+      0x66, 0x74, 0x79, 0x70, // 'ftyp'
+      0x69, 0x73, 0x6f, 0x6d, // major brand 'isom'
+      0x00, 0x00, 0x02, 0x00, // minor version
+      0x69, 0x73, 0x6f, 0x6d, // compatible: 'isom'
+      0x69, 0x73, 0x6f, 0x32, // 'iso2'
+      0x61, 0x76, 0x63, 0x31, // 'avc1'
+      0x6d, 0x70, 0x34, 0x31, // 'mp41'
+    ]);
+    const garbage = Buffer.concat([ftypBox, Buffer.from('no moov, no mdat, nothing decodable here')]);
     const res = await request(app)
       .post('/posts')
       .set('Authorization', `Bearer ${token}`)

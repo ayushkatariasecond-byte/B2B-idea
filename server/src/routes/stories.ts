@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db';
 import { requireAuth, optionalAuth, AuthedRequest } from '../middleware/auth';
 import { serializeBusiness } from '../utils/serialize';
-import { upload, mediaTypeFromMime } from '../upload';
+import { upload, mediaTypeFromMime, verifyUploadedMedia } from '../upload';
 import { getExcludedBusinessIds } from '../utils/blocking';
 import { transcodeVideo } from '../utils/videoTranscode';
 import { persistUpload } from '../storage';
@@ -11,7 +11,7 @@ export const storiesRouter = Router();
 
 const STORY_LIFETIME_MS = 24 * 60 * 60 * 1000;
 
-storiesRouter.post('/', requireAuth, upload.single('media'), async (req: AuthedRequest, res) => {
+storiesRouter.post('/', requireAuth, upload.single('media'), verifyUploadedMedia, async (req: AuthedRequest, res) => {
   if (!req.file) return res.status(400).json({ error: 'A photo or video is required' });
 
   const mediaType = mediaTypeFromMime(req.file.mimetype);

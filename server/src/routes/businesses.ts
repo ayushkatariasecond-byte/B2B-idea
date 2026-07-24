@@ -2,13 +2,14 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../db';
-import { requireAuth, requireOwner, optionalAuth, AuthedRequest } from '../middleware/auth';
+import { requireAuth, requireOwner, optionalAuth, rejectGuest, AuthedRequest } from '../middleware/auth';
 import { serializeBusiness, serializePost } from '../utils/serialize';
-import { upload } from '../upload';
+import { upload, verifyUploadedMedia } from '../upload';
 import { persistUpload } from '../storage';
 import { notify } from '../utils/notifications';
 import { getExcludedBusinessIds } from '../utils/blocking';
 import { hasCoords, boundingBox, matchesLocation, distanceMiles, DEFAULT_RADIUS_MILES } from '../utils/geo';
+import { webUrlSchema, isSafeWebUrl } from '../utils/url';
 
 export const businessesRouter = Router();
 
@@ -172,14 +173,16 @@ const updateSchema = z.object({
   // Both must arrive together to be applied — see the pairing check in the handler.
   latitude: z.number().finite().min(-90).max(90).optional(),
   longitude: z.number().finite().min(-180).max(180).optional(),
-  website: z.union([z.string().url().max(300), z.literal('')]).optional(),
+  // Scheme-restricted on purpose — a bare `.url()` here accepted `javascript:` and made
+  // this field a stored-XSS vector. See utils/url.ts.
+  website: webUrlSchema.optional(),
   cuisineSlug: z.string().min(1).max(50).optional(),
   // Full-replace, matching the update-your-whole-menu-at-once pattern this route already
   // uses elsewhere for small collections — no per-item CRUD endpoints for a flat list this size.
   menuItems: z.array(menuItemSchema).max(100).optional(),
 });
 
-businessesRouter.patch('/me', requireAuth, async (req: AuthedRequest, res) => {
+businessesRouter.patch('/me', requireAuth, rejectGuest, async (req: AuthedRequest, res) => {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' });
   const { cuisineSlug, website, latitude, longitude, ...rest } = parsed.data;
@@ -209,14 +212,14 @@ businessesRouter.patch('/me', requireAuth, async (req: AuthedRequest, res) => {
   res.json({ business: serializeBusiness(business) });
 });
 
-businessesRouter.post('/me/avatar', requireAuth, upload.single('media'), async (req: AuthedRequest, res) => {
+businessesRouter.post('/me/avatar', requireAuth, rejectGuest, upload.single('media'), verifyUploadedMedia, async (req: AuthedRequest, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   const avatarUrl = await persistUpload(req.file.filename);
   const business = await prisma.business.update({ where: { id: req.businessId! }, data: { avatarUrl } });
   res.json({ business: serializeBusiness(business) });
 });
 
-businessesRouter.post('/me/cover', requireAuth, upload.single('media'), async (req: AuthedRequest, res) => {
+businessesRouter.post('/me/cover', requireAuth, rejectGuest, upload.single('media'), verifyUploadedMedia, async (req: AuthedRequest, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   const coverUrl = await persistUpload(req.file.filename);
   const business = await prisma.business.update({ where: { id: req.businessId! }, data: { coverUrl } });
@@ -232,12 +235,12 @@ businessesRouter.post('/me/push-token', requireAuth, async (req: AuthedRequest, 
   res.json({ ok: true });
 });
 
-businessesRouter.post('/me/request-verification', requireAuth, requireOwner, async (req: AuthedRequest, res) => {
+businessesRouter.post('/me/request-verification', requireAuth, requireOwner, rejectGuest, async (req: AuthedRequest, res) => {
   const business = await prisma.business.update({ where: { id: req.businessId! }, data: { verificationRequested: true } });
   res.json({ business: serializeBusiness(business) });
 });
 
-businessesRouter.get('/me/export', requireAuth, requireOwner, async (req: AuthedRequest, res) => {
+businessesRouter.get('/me/export', requireAuth, requireOwner, rejectGuest, async (req: AuthedRequest, res) => {
   const businessId = req.businessId!;
   const [business, posts, comments, likes, following, followers, threads] = await Promise.all([
     prisma.business.findUnique({ where: { id: businessId } }),
@@ -262,7 +265,7 @@ businessesRouter.get('/me/export', requireAuth, requireOwner, async (req: Authed
   });
 });
 
-businessesRouter.delete('/me', requireAuth, requireOwner, async (req: AuthedRequest, res) => {
+businessesRouter.delete('/me', requireAuth, requireOwner, rejectGuest, async (req: AuthedRequest, res) => {
   const businessId = req.businessId!;
   await prisma.$transaction([
     prisma.like.deleteMany({ where: { businessId } }),

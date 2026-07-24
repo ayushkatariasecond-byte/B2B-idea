@@ -4,6 +4,39 @@ dotenv.config();
 
 const INSECURE_DEFAULT_JWT_SECRET = 'dev-secret-change-me';
 
+/**
+ * Values that must never sign a production token, beyond this file's own fallback.
+ *
+ * The gap this closes: `.env.example` shipped `JWT_SECRET="change-me-in-production"`, and the
+ * check below only ever rejected `dev-secret-change-me`. Copying the example to `.env` and
+ * deploying — the single most likely way this app reaches production — therefore passed the
+ * safety check while signing every auth token with a string published in the repository.
+ * Anyone who read the repo could mint a valid token for any account.
+ *
+ * Compared case-insensitively after trimming, since a placeholder that differs only in case
+ * or whitespace is the same mistake.
+ */
+const PLACEHOLDER_JWT_SECRETS = [
+  INSECURE_DEFAULT_JWT_SECRET,
+  'change-me-in-production',
+  'change-me',
+  'changeme',
+  'secret',
+  'jwt-secret',
+  'your-secret-here',
+  'todo',
+  // The placeholder currently in .env.example. Long enough to clear the length bar below,
+  // so it has to be named explicitly.
+  'replace_me_run_openssl_rand_hex_32',
+];
+
+/**
+ * A signing key shorter than this isn't meaningfully random no matter what it says. 32 is
+ * the low end of what's defensible for HMAC-SHA256 (what jsonwebtoken uses by default) and
+ * matches what `openssl rand -hex 32` / `crypto.randomBytes(32).toString('hex')` produce.
+ */
+const MIN_JWT_SECRET_LENGTH = 32;
+
 export const env = {
   jwtSecret: process.env.JWT_SECRET || INSECURE_DEFAULT_JWT_SECRET,
   port: Number(process.env.PORT) || 4000,
@@ -48,8 +81,17 @@ export function assertProductionSafety(): void {
   if (env.nodeEnv !== 'production') return;
 
   const problems: string[] = [];
-  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === INSECURE_DEFAULT_JWT_SECRET) {
-    problems.push('JWT_SECRET is missing or still the insecure default — set a long, random value.');
+  const jwtSecret = (process.env.JWT_SECRET ?? '').trim();
+  if (!jwtSecret) {
+    problems.push('JWT_SECRET is not set — generate one with: openssl rand -hex 32');
+  } else if (PLACEHOLDER_JWT_SECRETS.includes(jwtSecret.toLowerCase())) {
+    problems.push(
+      'JWT_SECRET is still a placeholder value from the docs/example config. Anyone who has read this repository knows it. Generate a real one with: openssl rand -hex 32'
+    );
+  } else if (jwtSecret.length < MIN_JWT_SECRET_LENGTH) {
+    problems.push(
+      `JWT_SECRET is only ${jwtSecret.length} characters — too short to be a real signing key. Use at least ${MIN_JWT_SECRET_LENGTH}: openssl rand -hex 32`
+    );
   }
   if (!process.env.DATABASE_URL) {
     problems.push('DATABASE_URL is not set.');

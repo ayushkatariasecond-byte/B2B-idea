@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../db';
 import { requireAuth, optionalAuth, AuthedRequest } from '../middleware/auth';
 import { serializePost } from '../utils/serialize';
-import { upload, mediaTypeFromMime } from '../upload';
+import { upload, mediaTypeFromMime, verifyUploadedMedia } from '../upload';
 import { extractHashtags } from '../utils/hashtags';
 import { getExcludedBusinessIds } from '../utils/blocking';
 import { notify } from '../utils/notifications';
@@ -317,7 +317,15 @@ postsRouter.get('/:id', optionalAuth, async (req: AuthedRequest, res) => {
     include: postInclude(req.businessId),
   });
   if (!post) return res.status(404).json({ error: 'Post not found' });
-  if (post.hidden && post.businessId !== req.businessId) {
+
+  // Only the author may fetch a post that isn't live yet. Previously this checked `hidden`
+  // but not `status`, so a draft or a not-yet-due scheduled post — an unannounced menu
+  // change, a promo timed to a specific hour — was readable by anyone holding its id, even
+  // though the feed, discover, and profile listings all correctly hide it via
+  // visibilityWhere(). 404 rather than 403 so this endpoint doesn't confirm that an id
+  // exists to someone who isn't allowed to see it.
+  const isLive = !post.hidden && (post.status === 'published' || (post.status === 'scheduled' && post.scheduledFor !== null && post.scheduledFor <= new Date()));
+  if (!isLive && post.businessId !== req.businessId) {
     return res.status(404).json({ error: 'Post not found' });
   }
   res.json({ post: serializePost(post) });
@@ -340,7 +348,7 @@ const postUpload = upload.fields([
   { name: 'thumbnail', maxCount: 1 },
 ]);
 
-postsRouter.post('/', requireAuth, postUpload, async (req: AuthedRequest, res) => {
+postsRouter.post('/', requireAuth, postUpload, verifyUploadedMedia, async (req: AuthedRequest, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' });
   if (containsBlockedContent(parsed.data.caption)) {

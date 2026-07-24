@@ -1,4 +1,5 @@
 import { computeCreativityScore, TRENDING_THRESHOLD } from './score';
+import { isSafeWebUrl } from './url';
 
 type CuisineLike = { id: string; name: string; slug: string };
 
@@ -45,7 +46,13 @@ export function serializeBusiness(b: BusinessLike, extra: Record<string, unknown
     // by the map endpoint (see routes/businesses.ts `/nearby`).
     hasLocation: b.latitude != null && b.longitude != null,
     isRestaurant: b.isRestaurant ?? false,
-    website: b.website ?? null,
+    // Re-checked on the way out, not just on the way in. The write path (PATCH /me) now
+    // rejects non-http(s) schemes, but rows written before that existed are still in the
+    // database, and this serializer is the single chokepoint every client read passes
+    // through — filtering here means a stored `javascript:` URL can't be served to a
+    // viewer even if it already got persisted. Dropping to null degrades to "no website
+    // shown" rather than handing the client something it will try to open.
+    website: b.website && isSafeWebUrl(b.website) ? b.website : null,
     cuisine: b.cuisine ?? null,
     menuItems: Array.isArray(b.menuItems) ? b.menuItems : [],
     ...extra,

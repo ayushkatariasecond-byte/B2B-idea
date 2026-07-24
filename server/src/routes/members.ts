@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../db';
-import { requireAuth, requireOwner, AuthedRequest } from '../middleware/auth';
+import { requireAuth, requireOwner, rejectGuest, AuthedRequest } from '../middleware/auth';
 import { sendTeamInviteEmail } from '../email';
 import { emailSchema } from '../utils/email';
 
@@ -22,7 +22,7 @@ const inviteSchema = z.object({
   role: z.enum(['editor']).optional().default('editor'),
 });
 
-membersRouter.post('/', requireAuth, requireOwner, async (req: AuthedRequest, res) => {
+membersRouter.post('/', requireAuth, requireOwner, rejectGuest, async (req: AuthedRequest, res) => {
   const parsed = inviteSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' });
   const { email, password, role } = parsed.data;
@@ -43,7 +43,7 @@ membersRouter.post('/', requireAuth, requireOwner, async (req: AuthedRequest, re
   res.status(201).json({ member: { id: member.id, email: member.email, role: member.role, createdAt: member.createdAt } });
 });
 
-membersRouter.delete('/:id', requireAuth, requireOwner, async (req: AuthedRequest, res) => {
+membersRouter.delete('/:id', requireAuth, requireOwner, rejectGuest, async (req: AuthedRequest, res) => {
   const member = await prisma.businessMember.findUnique({ where: { id: req.params.id } });
   if (!member || member.businessId !== req.businessId) return res.status(404).json({ error: 'Team member not found' });
   await prisma.businessMember.delete({ where: { id: member.id } });

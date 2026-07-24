@@ -1,6 +1,6 @@
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { env } from './env';
 
 /**
@@ -40,6 +40,45 @@ export const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many attempts. Please wait a few minutes and try again.' },
+});
+
+/**
+ * Per-ACCOUNT failed-login limiter, layered underneath the per-IP `authLimiter` above.
+ *
+ * Why both: authLimiter is keyed by IP and deliberately loose (100/15min) because a launch
+ * test can put ~50 real people behind one NAT'd address. Measured against a running server,
+ * that limit does engage — the 101st request gets a 429 — but until it does, all 100 of
+ * those attempts can be password guesses aimed at a single account. The allowance sized for
+ * "fifty people sharing one router" was silently also the allowance for "one attacker
+ * guessing one password."
+ *
+ * Keying on the submitted email instead separates those two cases cleanly: fifty people
+ * signing in to fifty different accounts never contend with each other, while guessing at
+ * one account runs out of budget after 10 tries no matter how many IPs it comes from.
+ *
+ * `skipSuccessfulRequests` means only FAILED attempts count, so someone who simply mistypes
+ * once and then gets it right never burns budget.
+ *
+ * Known tradeoff, accepted deliberately: because the key is the account rather than the
+ * caller, an attacker can spend 10 wrong guesses to make a specific account rate-limited
+ * for the rest of the window — a targeted, self-healing 15-minute nuisance. That is the
+ * standard cost of per-account throttling, and it is a much better failure mode than
+ * leaving a 100-guess budget open on every account.
+ */
+export const loginAccountLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  skip,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    // ipKeyGenerator rather than req.ip directly: it collapses IPv6 to a subnet, so a
+    // caller with a /64 worth of addresses can't trivially reset their own budget.
+    return email || ipKeyGenerator(req.ip ?? '');
+  },
+  message: { error: 'Too many sign-in attempts for this account. Please wait a few minutes and try again.' },
 });
 
 // Same shared-IP reasoning as authLimiter above, applied to general traffic: 600/min
