@@ -2,13 +2,13 @@
 
 # DMCA / Copyright Policy
 
-Last updated: [Date]
+Last updated: 2026-07-24
 
-[Company Name] respects the intellectual property rights of others and expects users of Verve (the "Service") to do the same. This policy explains how to report copyright infringement and how we respond.
+[Company Name] respects the intellectual property rights of others and expects users of Nibbler (the "Service") to do the same. This policy explains how to report copyright infringement and how we respond.
 
 ## 1. Filing a notice
 
-If you believe content on the Service infringes your copyright, send a written notice to our designated agent at **[DMCA Contact Email]** including:
+If you believe content on the Service infringes your copyright, send a written notice to our designated agent at **ayushkatariasecond@gmail.com** including:
 
 1. Identification of the copyrighted work claimed to be infringed.
 2. Identification of the material you claim is infringing, with enough detail for us to locate it (a link to the post, or the business handle and approximate post date).
@@ -23,7 +23,7 @@ Upon receiving a complete notice, we will remove or disable access to the identi
 
 ## 3. Counter-notice
 
-If you believe your content was removed in error, you may submit a counter-notice to **[DMCA Contact Email]** including your contact information, identification of the removed content, and a statement under penalty of perjury that you have a good-faith belief the content was removed by mistake. We may restore the content within a legally required waiting period unless the original complainant files a court action.
+If you believe your content was removed in error, you may submit a counter-notice to **ayushkatariasecond@gmail.com** including your contact information, identification of the removed content, and a statement under penalty of perjury that you have a good-faith belief the content was removed by mistake. We may restore the content within a legally required waiting period unless the original complainant files a court action.
 
 ## 4. Repeat infringer policy
 
@@ -31,4 +31,4 @@ Accounts that receive multiple valid infringement notices are subject to suspens
 
 ## 5. Contact
 
-Copyright agent: [Name], [Company Name] — [DMCA Contact Email] / [Mailing Address].
+Copyright agent: [Name], [Company Name] — ayushkatariasecond@gmail.com / [Mailing Address].

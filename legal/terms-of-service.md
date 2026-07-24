@@ -2,11 +2,11 @@
 
 # Terms of Service
 
-Last updated: [Date]
+Last updated: 2026-07-24
 
 ## 1. Who these terms are for
 
-These Terms of Service ("Terms") govern access to and use of Verve (the "Service"), operated by [Company Name] ("we," "us," "our"). By creating a business page, posting content, or otherwise using the Service, you agree to these Terms on behalf of yourself and the business you represent.
+These Terms of Service ("Terms") govern access to and use of Nibbler (the "Service"), operated by [Company Name] ("we," "us," "our"). By creating a business page, posting content, or otherwise using the Service, you agree to these Terms on behalf of yourself and the business you represent.
 
 ## 2. Eligibility
 
@@ -50,4 +50,4 @@ We may update these Terms from time to time. Continued use of the Service after 
 
 ## 11. Contact
 
-Questions about these Terms: [Contact Email].
+Questions about these Terms: ayushkatariasecond@gmail.com.

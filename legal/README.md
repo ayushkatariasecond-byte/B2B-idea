@@ -1,6 +1,6 @@
 # Legal documents — DRAFT, not reviewed
 
-Everything in this folder is boilerplate written to give Verve a reasonable starting point. **None of it has been reviewed by a lawyer and none of it should be published or relied on as-is.**
+Everything in this folder is boilerplate written to give Nibbler a reasonable starting point. **None of it has been reviewed by a lawyer and none of it should be published or relied on as-is.**
 
 Before using any of these:
 - Have an actual attorney review them for your jurisdiction(s) and business structure.

@@ -16,6 +16,7 @@
     "seed": "ts-node --transpile-only prisma/seed.ts",
     "seed:cuisines": "ts-node --transpile-only prisma/seedCuisines.ts",
     "seed:nibbler": "ts-node --transpile-only prisma/seedCuisines.ts && ts-node --transpile-only prisma/seedNibbler.ts",
+    "seed:city": "ts-node --transpile-only prisma/seedCity.ts",
     "fix:normalize-emails": "ts-node --transpile-only scripts/normalizeEmails.ts",
     "test": "jest --runInBand"
   },

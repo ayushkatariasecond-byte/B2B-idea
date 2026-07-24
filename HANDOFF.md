@@ -1,3 +1,11 @@
+> **This document predates the Nibbler fork and is now stale in places** — most notably §1/§4.1
+> ("currently SQLite") and §3 (the reopen intro animation), both of which no longer apply: this
+> branch's `schema.prisma` already targets Postgres, and the scroll-driven reopen intro described
+> in §3 has been removed in favor of a static landing screen. Sections §3.5 (provisioned services)
+> and §4.7 (legal) are still accurate as background, but **for actual deploy steps use `DEPLOY.md`
+> in the repo root instead of this file** — it reflects the current Nibbler-specific state,
+> including which of the two Supabase projects to use.
+
 # Verve — Handoff & Go-Live Guide
 
 Hi 👋 — this doc is for the developer taking Verve from "runs on my laptop" to "live and public."

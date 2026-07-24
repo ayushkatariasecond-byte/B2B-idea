@@ -1,120 +1,138 @@
-# Verve — Deploy to Production (Railway + Vercel)
+# Nibbler — Deploy to Production (Railway + Vercel)
 
-This is the exact, click-by-click path to take Verve **live on the public internet**. It uses:
+This is the exact, click-by-click path to take **Nibbler** (the city-locked restaurant video app,
+forked from the pre-pivot Verve codebase) live on the public internet. It uses:
 
 - **Railway** — hosts the backend API (Node/Express + WebSockets)
-- **Supabase** — Postgres database + media storage (already provisioned: project `verve-prod`)
+- **Supabase** — Postgres database + media storage
 - **Vercel** — hosts the web app (the Expo web build)
 
-Plan for ~60–90 minutes the first time. You need: a GitHub account (repo already there), and free
-Railway + Vercel + Supabase accounts. Have the provisioned values from `HANDOFF.md §3.5` handy
-(Supabase `DATABASE_URL`, `SENTRY_DSN`) plus the two keys you'll generate below.
+Plan for ~30–45 minutes — most of the provisioning below is already done (see "What's already
+provisioned" first). You need: a GitHub account (repo already there), and free Railway + Vercel
+accounts.
 
 ---
 
-## Part A — One-time prep (Supabase dashboard, ~10 min)
+## Which Supabase project — read this first
 
-1. **Get the database URL.** Supabase → project **verve-prod** → *Project Settings → Database →
-   Connection string → URI*. Copy it. It looks like
-   `postgresql://postgres:[PASSWORD]@db.iftkjajuyhiojipjokem.supabase.co:5432/postgres`.
-   The password is the one from `HANDOFF.md §3.5`. **This is `DATABASE_URL`.**
-   - Tip: for a serverless host, also grab the **Connection pooling** URI (port 6543) and add
-     `?pgbouncer=true` — but the direct URL above is fine to start.
-2. **Create the storage bucket.** Supabase → **Storage** → *New bucket* → name it `media` →
-   toggle **Public bucket** on → create. Then *Settings → API*: copy the **Project URL**
-   (`SUPABASE_URL`) and the **`service_role` key** (`SUPABASE_SERVICE_KEY`). Keep the service key
-   secret — it bypasses row security.
-3. **Flip Prisma to Postgres** (one line, in the repo). In `server/prisma/schema.prisma` change:
-   ```prisma
-   datasource db {
-     provider = "postgresql"   // was "sqlite"
-     url      = env("DATABASE_URL")
-   }
-   ```
-   Commit + push. (The schema is already applied to `verve-prod`; the server's `predev` step runs
-   `prisma db push` on boot, which reconciles as a no-op.)
+This repo also has an older Supabase project, **`verve-prod`**, referenced in `HANDOFF.md` — that
+one was provisioned for the pre-pivot Verve app (or possibly the separate agency-directory pivot
+branch) and its schema was last verified against an earlier, different data model. **Do not point
+Nibbler at `verve-prod`.**
 
-## Part B — Generate the two remaining keys (~5 min)
-
-4. **SendGrid API key.** SendGrid → *Settings → API Keys → Create API Key* → "Restricted", enable
-   **Mail Send** → create → copy it once. **This is `SENDGRID_API_KEY`.**
-5. **Sentry DSN** — already provisioned (`HANDOFF.md §3.5`). **This is `SENTRY_DSN`.**
+Nibbler has its own dedicated project, **`nibbler-prototype`** (ref `lfktfjeyuzdloohvzqbx`), created
+during this fork's own hardening pass, with the current Nibbler schema (restaurants, cuisines, city
+lock, promo codes) already migrated and verified against it. Use this one. If you'd rather not run a
+public launch on a project literally named "-prototype," rename it from the Supabase dashboard
+(Project Settings → General) — same ref, same data, just a cosmetic name change.
 
 ---
 
-## Part C — Deploy the backend to Railway (~20 min)
+## What's already provisioned (done — don't redo)
 
-6. Go to **railway.app** → *New Project* → **Deploy from GitHub repo** → pick
-   `ayushkatariasecond-byte/b2b-idea`.
-7. Railway will detect a Node app. Set the service's **Root Directory** to `server`.
+- **Postgres** — `nibbler-prototype`'s schema is applied and this branch's Prisma `datasource` is
+  already set to `postgresql` (not sqlite). Local dev already runs against it.
+- **Media storage** — a public `media` bucket exists on `nibbler-prototype` (50MB limit, restricted
+  to the same image/video mimetype allowlist as `server/src/upload.ts` — nothing else can land in it).
+- **Sentry** — org `verve` / project `verve-api` exists with a live, tested DSN.
+- **SendGrid** — sender `ayushkatariasecond@gmail.com` is verified and already sending real mail
+  (domain authentication isn't set up, which affects deliverability polish, not whether it works).
+- **Production secret** — a fresh, random `JWT_SECRET` has been generated (see the values handed to
+  you separately in chat — never commit real secrets into this file).
+- **`server/src/env.ts`** now refuses to boot in production at all unless `JWT_SECRET`,
+  `DATABASE_URL`, and `ADMIN_EMAIL` are properly set — a misconfigured deploy fails loudly on
+  startup instead of silently running insecure.
+
+## Still needed from you (can't be scripted)
+
+1. **A SendGrid API key.** SendGrid → *Settings → API Keys → Create API Key* → "Restricted", enable
+   **Mail Send** → create → copy it once (shown only at creation time). This is `SENDGRID_API_KEY`.
+2. **Railway access.** The Composio connection to your Railway account is currently returning an
+   authorization error on basic queries — reconnect it, or just do the steps in Part A below by hand
+   in Railway's own dashboard (genuinely ~10 minutes).
+3. **Real launch-city content.** The For You feed is hard city-locked — a city with zero posts shows
+   an empty feed to its first visitor. `npm run seed:city -- "Your City"` (in `server/`) drops in six
+   placeholder-image example restaurants to prove the pipeline end to end, but — **read the warning
+   at the top of `server/prisma/seedCity.ts` before running this against a real public database** —
+   it's flat-color placeholder images and fictional business names, not a substitute for real content
+   from real restaurants.
+
+---
+
+## Part A — Deploy the backend to Railway (~15 min)
+
+1. Go to **railway.app** → *New Project* → **Deploy from GitHub repo** → pick this repo, branch
+   `claude/nibbler-prototype`.
+2. Set the service's **Root Directory** to `server`.
    - **Build command:** `npm install && npm run build`
    - **Start command:** `npm start`
-   (These come from `server/package.json`.)
-8. Add **Variables** (Railway → your service → *Variables*). Paste each:
+3. Add these **Variables** (Railway → your service → *Variables*). The real values for the ones
+   marked *(provisioned)* were given to you separately in chat, not in this file:
    ```
-   DATABASE_URL      = <the Supabase URI from step 1>
-   JWT_SECRET        = <a long random string — generate one, keep it secret>
-   NODE_ENV          = production
-   APP_WEB_URL       = https://<your-vercel-domain>   # fill in after Part D, then redeploy
-   SENTRY_DSN        = <from HANDOFF §3.5>
-   SENDGRID_API_KEY  = <from step 4>
-   EMAIL_FROM        = ayushkatariasecond@gmail.com
-   EMAIL_FROM_NAME   = Verve
-   SUPABASE_URL      = <from step 2>
-   SUPABASE_SERVICE_KEY = <from step 2>
-   SUPABASE_BUCKET   = media
+   DATABASE_URL          = <nibbler-prototype's connection string>       (provisioned)
+   JWT_SECRET            = <the generated secret>                       (provisioned)
+   NODE_ENV              = production
+   ADMIN_EMAIL           = ayushkatariasecond@gmail.com
+   APP_WEB_URL           = https://<your-vercel-domain>   # fill in after Part B, then redeploy
+   ALLOWED_ORIGIN        = https://<your-vercel-domain>   # same — locks CORS to just your web app
+   SENTRY_DSN            = <the verve-api DSN>                          (provisioned)
+   SENDGRID_API_KEY      = <the key you generate in step 1 above>
+   EMAIL_FROM            = ayushkatariasecond@gmail.com
+   EMAIL_FROM_NAME       = Nibbler
+   SUPABASE_URL          = https://lfktfjeyuzdloohvzqbx.supabase.co
+   SUPABASE_SERVICE_KEY  = <nibbler-prototype's service-role key>       (provisioned)
+   SUPABASE_BUCKET       = media
    ```
-9. Deploy. When it's up, Railway gives you a URL like `https://verve-production.up.railway.app`.
-   Test it: open `<that-url>/health` → you should see `{"ok":true}`. **This URL is your API base.**
-   - Railway supports WebSockets by default, so the realtime `/ws` endpoint works with no extra config.
+4. Deploy. Railway gives you a URL like `https://nibbler-production.up.railway.app`. Test
+   `<that-url>/health` → `{"ok":true,"db":"connected"}`. **This URL is your API base.**
+   WebSockets (`/ws`) work with no extra Railway config.
 
-## Part D — Deploy the web app to Vercel (~20 min)
+## Part B — Deploy the web app to Vercel (~15 min)
 
-10. The web app needs to know the API URL at **build time**. In `app/`, the API base comes from
-    `EXPO_PUBLIC_API_URL` (`app/src/api/client.ts`).
-11. Go to **vercel.com** → *Add New Project* → import the same GitHub repo.
-    - **Root Directory:** `app`
-    - **Build command:** `npx expo export --platform web`
-    - **Output directory:** `dist`
-    - **Install command:** `npm install`
-12. Add **Environment Variables**:
-    - `EXPO_PUBLIC_API_URL = https://<your-railway-url>` (from step 9)
-    - `EXPO_PUBLIC_SENTRY_DSN = <the same SENTRY_DSN>` (optional — turns on client-side error
-      reporting from the web/mobile app; safe to expose, it's a client DSN)
-13. Deploy. Vercel gives you a URL like `https://verve.vercel.app`. Open it — you should get the
-    reopen intro, then the app, talking to your live backend.
+5. **vercel.com** → *Add New Project* → import this repo, branch `claude/nibbler-prototype`.
+   - **Root Directory:** `app`
+   - **Build command:** `npx expo export --platform web`
+   - **Output directory:** `dist`
+   - **Install command:** `npm install`
+6. Add **Environment Variables**:
+   - `EXPO_PUBLIC_API_URL = https://<your-railway-url>` (from Part A step 4)
+7. Deploy. Vercel gives you a URL (`https://nibbler.vercel.app` or similar). Open it — you should
+   land on the new landing screen, then be able to sign up and reach a live, working app.
 
-## Part E — Wire the two sides together (~10 min)
+## Part C — Wire the two sides together (~5 min)
 
-14. **Point the app at the API** — done in step 12.
-15. **Point the API at the app** — go back to Railway, set `APP_WEB_URL` to your Vercel URL
-    (step 13), and redeploy. This makes the links inside emails point to the real site.
-16. **Lock down CORS.** Right now the API accepts requests from any origin (`server/src/index.ts`).
-    Before real launch, restrict it to your web domain. (This is on the security-hardening list;
-    if that's already merged, set an `ALLOWED_ORIGIN` env var to your Vercel URL.)
-17. **Custom domain (optional).** In Vercel add your domain (e.g. `verve.com`); in Railway add
-    `api.verve.com`. Update `EXPO_PUBLIC_API_URL` and `APP_WEB_URL` to the custom domains and
-    redeploy both.
+8. Go back to Railway, set `APP_WEB_URL` and `ALLOWED_ORIGIN` to the real Vercel URL from Part B,
+   redeploy. This makes email links point to the real site and locks CORS to just that origin.
+9. **Custom domain (optional).** Point it at Vercel for the web app; add a subdomain (e.g.
+   `api.yourdomain.com`) pointed at Railway for the backend. Update `EXPO_PUBLIC_API_URL`,
+   `APP_WEB_URL`, and `ALLOWED_ORIGIN` to match, redeploy both sides.
 
 ---
 
 ## After it's live — smoke test checklist
 
-- [ ] `<api-url>/health` returns `{"ok":true}`
-- [ ] Sign up a new business on the live site → you receive the welcome email
-- [ ] Post a photo/video → it uploads and plays (confirms Supabase Storage)
-- [ ] "Forgot password?" → you receive the reset email → the link resets your password
-- [ ] Break something on purpose (or check after a day) → the error shows in Sentry → project `verve-api`
+- [ ] `<api-url>/health` returns `{"ok":true,"db":"connected"}`
+- [ ] Sign up a new restaurant account on the live site → welcome email arrives
+- [ ] Post a photo/video → it uploads and plays back (confirms Supabase Storage is actually wired,
+  not silently falling back to local disk)
+- [ ] Upload a profile avatar → same check
+- [ ] "Forgot password?" → reset email arrives → the link resets your password
+- [ ] Trigger an error on purpose (or check after a day) → it shows up in Sentry, project `verve-api`
 - [ ] Invite a teammate → they receive the invite email
+- [ ] The city you launched in actually shows content in the For You feed (see seed-content note above)
 
-## Still required before a *public* launch (not deploy steps)
+## Still required before a genuinely *public* launch (not deploy steps)
 
-- **Legal review** of `terms-of-service.md` / `privacy-policy.md` / `dmca-policy.md` by a lawyer,
-  and register a DMCA agent (it's a user-content platform). See `HANDOFF.md §4.7`.
-- **Native app-store apps** (iOS/Android) are a separate track — see `HANDOFF.md §5`.
+- **Legal review.** `legal/terms-of-service.md`, `legal/privacy-policy.md`, `legal/dmca-policy.md`
+  are rebranded for Nibbler but are still **unreviewed drafts** — a lawyer needs to look at these
+  (DMCA agent registration, GDPR/CCPA fit, age gating) before opening to strangers. Don't skip this
+  because the rest of the checklist is green.
+- **Native app-store apps** (iOS/Android) are a separate track, not covered here — ask if you want
+  that scoped out.
 
 ## Cost note
 
-Railway, Vercel, and Supabase all have free tiers that comfortably cover a launch/beta. You'll only
-pay once you have meaningful traffic or need always-on backend hours. SendGrid's free tier sends
-~100 emails/day, plenty to start.
+Railway, Vercel, and Supabase all have free tiers that comfortably cover a launch/beta. One thing to
+watch specifically: **Supabase's free tier pauses a project after about a week of inactivity** —
+worth knowing if there's a gap between test sessions, since the whole app goes down with it until
+someone manually unpauses it from the dashboard.

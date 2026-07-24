@@ -2,11 +2,11 @@
 
 # Privacy Policy
 
-Last updated: [Date]
+Last updated: 2026-07-24
 
 ## 1. What this covers
 
-This Privacy Policy describes how [Company Name] ("we," "us") collects, uses, and shares information in connection with Verve (the "Service").
+This Privacy Policy describes how [Company Name] ("we," "us") collects, uses, and shares information in connection with Nibbler (the "Service").
 
 ## 2. Information we collect
 
@@ -33,7 +33,7 @@ From **Settings**, you can:
 - **Download your data** — a JSON export of your business profile, posts, comments, likes, follows, and message threads.
 - **Delete your account** — permanently removes your business page and associated content.
 
-Depending on your location, you may have additional rights under GDPR (EU/UK), CCPA/CPRA (California), or similar laws, including the right to correct inaccurate data or object to certain processing. Contact us at [Contact Email] to exercise these rights.
+Depending on your location, you may have additional rights under GDPR (EU/UK), CCPA/CPRA (California), or similar laws, including the right to correct inaccurate data or object to certain processing. Contact us at ayushkatariasecond@gmail.com to exercise these rights.
 
 ## 7. Data retention
 
@@ -53,4 +53,4 @@ We may update this Privacy Policy from time to time. Material changes will be co
 
 ## 11. Contact
 
-Questions about this policy or requests regarding your data: [Contact Email].
+Questions about this policy or requests regarding your data: ayushkatariasecond@gmail.com.
