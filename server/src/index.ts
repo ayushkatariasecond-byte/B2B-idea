@@ -6,7 +6,7 @@
 import 'express-async-errors';
 import express from 'express';
 import multer from 'multer';
-import { env } from './env';
+import { env, assertProductionSafety } from './env';
 import { authRouter } from './routes/auth';
 import { businessesRouter } from './routes/businesses';
 import { postsRouter } from './routes/posts';
@@ -111,6 +111,7 @@ async function publishDueScheduledPosts() {
 }
 
 if (require.main === module) {
+  assertProductionSafety();
   const server = app.listen(env.port, () => {
     console.log(`Verve API listening on http://localhost:${env.port}`);
   });

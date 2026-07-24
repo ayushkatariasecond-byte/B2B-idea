@@ -1486,6 +1486,64 @@ describe('Verve API', () => {
     expect(res.status).toBe(400);
   });
 
+  it('rejects an SVG upload even though its mimetype starts with "image/"', async () => {
+    // image/svg+xml used to pass the old `startsWith('image/')` check and get served back by
+    // express.static with that same content-type — a browser treats that as active content,
+    // so an SVG with an embedded <script> is a stored-XSS payload, not an inert image.
+    const { token } = await signup('svgupload');
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+    const res = await request(app)
+      .post('/posts')
+      .set('Authorization', `Bearer ${token}`)
+      .field('caption', 'Not actually an image')
+      .field('tag', 'Culture')
+      .attach('media', svg, { filename: 'evil.svg', contentType: 'image/svg+xml' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('derives the stored file extension from the validated mimetype, not the client-supplied filename', async () => {
+    // A client fully controls `originalname`; deriving the stored extension from it (rather
+    // than from the mimetype fileFilter already checked) would let that same attacker-chosen
+    // string decide how the file is later served, regardless of what fileFilter approved.
+    const { token } = await signup('trickyfilename');
+    const res = await request(app)
+      .post('/posts')
+      .set('Authorization', `Bearer ${token}`)
+      .field('caption', 'Sneaky filename, real image bytes')
+      .field('tag', 'Culture')
+      .attach('media', fs.readFileSync(path.join(__dirname, 'fixtures', 'sample.png')), {
+        filename: 'not-what-it-looks-like.svg',
+        contentType: 'image/png',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.post.mediaUrl).toMatch(/\.png$/);
+  });
+
+  it('uploads an avatar and a cover photo through the same persistence path posts/stories use', async () => {
+    // Regression guard: /me/avatar and /me/cover used to hardcode a local `/uploads/...` path
+    // instead of calling persistUpload() like every other upload route, so profile photos
+    // silently never made it to Supabase Storage even when it was configured. Storage isn't
+    // configured in this test env either way, so persistUpload() resolves to the same local
+    // path here — this mainly guards against a regression in wiring, not the Supabase path.
+    const { token } = await signup('avatarcoveruser');
+
+    const avatarRes = await request(app)
+      .post('/businesses/me/avatar')
+      .set('Authorization', `Bearer ${token}`)
+      .attach('media', path.join(__dirname, 'fixtures', 'sample.png'));
+    expect(avatarRes.status).toBe(200);
+    expect(avatarRes.body.business.avatarUrl).toMatch(/^\/uploads\/.+\.png$/);
+
+    const coverRes = await request(app)
+      .post('/businesses/me/cover')
+      .set('Authorization', `Bearer ${token}`)
+      .attach('media', path.join(__dirname, 'fixtures', 'sample.png'));
+    expect(coverRes.status).toBe(200);
+    expect(coverRes.body.business.coverUrl).toMatch(/^\/uploads\/.+\.png$/);
+  });
+
   it('shows an empty result (not another city\'s posts) when the cuisine filter matches nothing in the viewer\'s own city', async () => {
     const restaurant = await signup('zeromatchcuisine', { city: 'Zerotown', cuisineSlug: 'italian' });
     await createPost(restaurant.token, { caption: 'Italian food in Zerotown' });

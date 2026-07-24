@@ -14,6 +14,24 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Every value interpolated into an email's HTML *body* below is user-controlled (a business's
+ * own name, a team name, an invite password) and must go through this first — `sendEmail`
+ * only strips tags for the plain-text fallback, not the HTML actually sent. Left un-escaped,
+ * the team-invite email in particular would let a business set its own `name` to arbitrary
+ * markup and have it delivered, under this app's sender identity, to any third-party email
+ * address it invites (invitees don't need an existing account). Not used on subject lines —
+ * those are a plain-text header context, where HTML-escaping would just show literal entities.
+ */
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export async function sendEmail(opts: { to: string; subject: string; html: string }): Promise<void> {
   if (!ready) {
     console.log(`[email] (SENDGRID_API_KEY unset — not sent) "${opts.subject}" → ${opts.to}`);
@@ -50,7 +68,7 @@ export function sendWelcomeEmail(business: { email: string; name: string }, veri
     to: business.email,
     subject: `Welcome to Verve, ${business.name}`,
     html: shell(`
-      <p style="font-size:16px;line-height:1.5;">Your page <b>${business.name}</b> is live.</p>
+      <p style="font-size:16px;line-height:1.5;">Your page <b>${escapeHtml(business.name)}</b> is live.</p>
       ${verifyBlock}
       <p style="font-size:15px;line-height:1.6;color:#3a3426;">Post your first short video, and Verve's creativity score will start ranking it by real engagement — reach that rewards good work instead of burying it.</p>
       ${goldButton(env.appWebUrl, 'Open Verve')}`),
@@ -83,9 +101,9 @@ export function sendTeamInviteEmail(opts: { to: string; tempPassword: string; te
     to: opts.to,
     subject: `You've been added to ${opts.teamName} on Verve`,
     html: shell(`
-      <p style="font-size:16px;line-height:1.5;">You've been invited to help run <b>${opts.teamName}</b> on Verve.</p>
+      <p style="font-size:16px;line-height:1.5;">You've been invited to help run <b>${escapeHtml(opts.teamName)}</b> on Verve.</p>
       <p style="font-size:15px;line-height:1.6;color:#3a3426;">Sign in with this email and the temporary password below, then change it from Settings.</p>
-      <div style="margin:14px 0;padding:12px 16px;background:#f3f2ee;border-radius:10px;font-family:ui-monospace,monospace;font-size:15px;">${opts.tempPassword}</div>
+      <div style="margin:14px 0;padding:12px 16px;background:#f3f2ee;border-radius:10px;font-family:ui-monospace,monospace;font-size:15px;">${escapeHtml(opts.tempPassword)}</div>
       <a href="${env.appWebUrl}/login" style="display:inline-block;margin-top:8px;padding:11px 20px;border-radius:100px;background:linear-gradient(135deg,#e3b842,#c58300);color:#fff;font-weight:700;text-decoration:none;">Sign in</a>`),
   });
 }

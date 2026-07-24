@@ -5,6 +5,7 @@ import { prisma } from '../db';
 import { requireAuth, requireOwner, optionalAuth, AuthedRequest } from '../middleware/auth';
 import { serializeBusiness, serializePost } from '../utils/serialize';
 import { upload } from '../upload';
+import { persistUpload } from '../storage';
 import { notify } from '../utils/notifications';
 
 export const businessesRouter = Router();
@@ -127,14 +128,14 @@ businessesRouter.patch('/me', requireAuth, async (req: AuthedRequest, res) => {
 
 businessesRouter.post('/me/avatar', requireAuth, upload.single('media'), async (req: AuthedRequest, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  const avatarUrl = `/uploads/${req.file.filename}`;
+  const avatarUrl = await persistUpload(req.file.filename);
   const business = await prisma.business.update({ where: { id: req.businessId! }, data: { avatarUrl } });
   res.json({ business: serializeBusiness(business) });
 });
 
 businessesRouter.post('/me/cover', requireAuth, upload.single('media'), async (req: AuthedRequest, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  const coverUrl = `/uploads/${req.file.filename}`;
+  const coverUrl = await persistUpload(req.file.filename);
   const business = await prisma.business.update({ where: { id: req.businessId! }, data: { coverUrl } });
   res.json({ business: serializeBusiness(business) });
 });

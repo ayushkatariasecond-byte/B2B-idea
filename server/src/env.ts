@@ -2,8 +2,10 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const INSECURE_DEFAULT_JWT_SECRET = 'dev-secret-change-me';
+
 export const env = {
-  jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-me',
+  jwtSecret: process.env.JWT_SECRET || INSECURE_DEFAULT_JWT_SECRET,
   port: Number(process.env.PORT) || 4000,
   nodeEnv: process.env.NODE_ENV || 'development',
 
@@ -34,3 +36,29 @@ export const env = {
   supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY || '',
   supabaseBucket: process.env.SUPABASE_BUCKET || 'media',
 };
+
+/**
+ * Called once at real server startup (never on import, so the test suite and any script
+ * that just imports `app` are unaffected) to fail loudly instead of quietly running unsafe.
+ * Without this, a production deploy that forgot to set JWT_SECRET wouldn't error at all —
+ * it would just sign and verify every token with a fallback string sitting in this file in
+ * plaintext, letting anyone forge a valid auth token for any account.
+ */
+export function assertProductionSafety(): void {
+  if (env.nodeEnv !== 'production') return;
+
+  const problems: string[] = [];
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === INSECURE_DEFAULT_JWT_SECRET) {
+    problems.push('JWT_SECRET is missing or still the insecure default — set a long, random value.');
+  }
+  if (!process.env.DATABASE_URL) {
+    problems.push('DATABASE_URL is not set.');
+  }
+  if (!process.env.ADMIN_EMAIL) {
+    problems.push('ADMIN_EMAIL is not set — moderation endpoints would gate on a placeholder address.');
+  }
+
+  if (problems.length > 0) {
+    throw new Error(`Refusing to start in production with unsafe configuration:\n- ${problems.join('\n- ')}`);
+  }
+}

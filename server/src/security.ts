@@ -54,3 +54,17 @@ export const apiLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many requests. Please slow down a moment.' },
 });
+
+// Promo code redemption is deliberately public and unauthenticated (see routes/promoCodes.ts)
+// — a real redemption often happens at a register with no login involved. That also makes it
+// the one place an anonymous caller can cheaply script through many guesses at a valid code.
+// 20/min/IP is generous for a real customer typing one code at checkout, and slow enough to
+// make brute-forcing short codes impractical, on top of the general apiLimiter above.
+export const promoRedeemLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 20,
+  skip,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Please wait a moment and try again.' },
+});

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db';
 import { requireAuth, optionalAuth, AuthedRequest } from '../middleware/auth';
+import { promoRedeemLimiter } from '../security';
 
 export const promoCodesRouter = Router();
 
@@ -56,7 +57,7 @@ const redeemSchema = z.object({
 // redemptions of the same code are allowed on purpose — see the schema comment on
 // PromoCode for the reasoning (shared code, no reliable identity to dedupe against for
 // anonymous callers anyway).
-promoCodesRouter.post('/redeem', optionalAuth, async (req: AuthedRequest, res) => {
+promoCodesRouter.post('/redeem', promoRedeemLimiter, optionalAuth, async (req: AuthedRequest, res) => {
   const parsed = redeemSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' });
   const code = normalizeCode(parsed.data.code);
