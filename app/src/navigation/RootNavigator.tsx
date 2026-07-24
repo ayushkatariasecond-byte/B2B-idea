@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { createNativeStackNavigator, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
@@ -8,7 +8,6 @@ import { useRealtimeConnection } from '../hooks/useRealtimeConnection';
 import { colors } from '../theme/tokens';
 import { RootStackParamList } from './types';
 import { TabNavigator } from './TabNavigator';
-import { ReopenIntro } from '../screens/ReopenIntro';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { SignupScreen } from '../screens/SignupScreen';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -53,19 +52,8 @@ function TabsGate() {
   return <TabNavigator />;
 }
 
-/**
- * The reopen intro greets a real app open once, then hands off into the live feed. It is
- * NOT an addressable route (per the TabsGate lesson above, fighting React Navigation's web
- * `linking` sync to make an unmapped screen "sticky" doesn't work). Instead the real app is
- * mounted underneath and the intro is a plain absolute overlay on top that dissolves to
- * reveal it — so the handoff is seamless with no navigation and no unmount mid-gesture. The
- * module-level flag (reset only by an actual page/app reload) keeps it to once per session.
- */
-let hasShownReopen = false;
-
 export function RootNavigator() {
   const { business, isLoading } = useAuth();
-  const [showReopen, setShowReopen] = useState(() => !hasShownReopen);
   usePushNotifications(Boolean(business));
   useRealtimeConnection(Boolean(business));
 
@@ -115,17 +103,5 @@ export function RootNavigator() {
     );
   }
 
-  return (
-    <View style={{ flex: 1 }}>
-      {content}
-      {showReopen && (
-        <ReopenIntro
-          onDone={() => {
-            hasShownReopen = true;
-            setShowReopen(false);
-          }}
-        />
-      )}
-    </View>
-  );
+  return <View style={{ flex: 1 }}>{content}</View>;
 }
