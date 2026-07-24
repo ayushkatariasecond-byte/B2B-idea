@@ -8,6 +8,7 @@ import { z } from 'zod';
  */
 export const emailSchema = z
   .string()
+  .max(254, 'Email is too long') // RFC 5321 max total length — a defensive cap, not a real-world constraint
   .transform((v) => v.trim().toLowerCase())
   .pipe(z.string().email());
 

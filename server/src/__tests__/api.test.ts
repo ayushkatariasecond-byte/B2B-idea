@@ -1,6 +1,7 @@
 import request from 'supertest';
 import path from 'path';
 import fs from 'fs';
+import jwt from 'jsonwebtoken';
 import { app } from '../index';
 import { prisma } from '../db';
 import { UPLOAD_DIR } from '../upload';
@@ -1126,5 +1127,377 @@ describe('Verve API', () => {
     });
     expect(res.body.business.cuisine).toMatchObject({ name: 'Indian', slug: 'indian' });
     expect(res.body.business.menuItems).toEqual([{ name: 'Butter Chicken', price: 15 }]);
+  });
+
+  // --- Promo codes ---
+
+  it('lets a restaurant create a promo code, but not a plain viewer', async () => {
+    const restaurant = await signup('promocreator1');
+    const create = await request(app)
+      .post('/promo-codes')
+      .set('Authorization', `Bearer ${restaurant.token}`)
+      .send({ code: 'save10', discountDescription: '10% off' });
+    expect(create.status).toBe(201);
+    expect(create.body.promoCode).toMatchObject({ code: 'SAVE10', discountDescription: '10% off', active: true });
+
+    const viewer = await signup('promoviewer1', { isRestaurant: false });
+    const viewerCreate = await request(app)
+      .post('/promo-codes')
+      .set('Authorization', `Bearer ${viewer.token}`)
+      .send({ code: 'VIEWER10', discountDescription: '10% off' });
+    expect(viewerCreate.status).toBe(403);
+  });
+
+  it('rejects creating a code that is already taken', async () => {
+    const restaurant = await signup('promodupecreator');
+    await request(app)
+      .post('/promo-codes')
+      .set('Authorization', `Bearer ${restaurant.token}`)
+      .send({ code: 'DUPE20', discountDescription: '20% off' });
+
+    const other = await signup('promodupecreator2');
+    const dupe = await request(app)
+      .post('/promo-codes')
+      .set('Authorization', `Bearer ${other.token}`)
+      .send({ code: 'dupe20', discountDescription: 'a different description' });
+    expect(dupe.status).toBe(409);
+  });
+
+  it('rejects malformed promo codes (too short, or containing invalid characters)', async () => {
+    const restaurant = await signup('promovalidatecreator');
+    const tooShort = await request(app)
+      .post('/promo-codes')
+      .set('Authorization', `Bearer ${restaurant.token}`)
+      .send({ code: 'ab', discountDescription: '10% off' });
+    expect(tooShort.status).toBe(400);
+
+    const badChars = await request(app)
+      .post('/promo-codes')
+      .set('Authorization', `Bearer ${restaurant.token}`)
+      .send({ code: 'SAVE 10%!', discountDescription: '10% off' });
+    expect(badChars.status).toBe(400);
+  });
+
+  it('redeems a valid code anonymously (no auth), case-insensitively', async () => {
+    const restaurant = await signup('promoredeemcreator');
+    await request(app)
+      .post('/promo-codes')
+      .set('Authorization', `Bearer ${restaurant.token}`)
+      .send({ code: 'ANON15', discountDescription: '15% off' });
+
+    const redeem = await request(app).post('/promo-codes/redeem').send({ code: 'anon15' });
+    expect(redeem.status).toBe(201);
+    expect(redeem.body.ok).toBe(true);
+    expect(redeem.body.redeemedAt).toBeTruthy();
+  });
+
+  it('rejects redemption of a code that does not exist', async () => {
+    const res = await request(app).post('/promo-codes/redeem').send({ code: 'NOSUCHCODE' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects redemption of an inactive ("expired") code', async () => {
+    const restaurant = await signup('promoinactivecreator');
+    const create = await request(app)
+      .post('/promo-codes')
+      .set('Authorization', `Bearer ${restaurant.token}`)
+      .send({ code: 'GONE30', discountDescription: '30% off' });
+    await prisma.promoCode.update({ where: { id: create.body.promoCode.id }, data: { active: false } });
+
+    const redeem = await request(app).post('/promo-codes/redeem').send({ code: 'GONE30' });
+    expect(redeem.status).toBe(400);
+  });
+
+  it('allows the same code to be redeemed multiple times (duplicates are allowed by design)', async () => {
+    const restaurant = await signup('promomulticreator');
+    await request(app)
+      .post('/promo-codes')
+      .set('Authorization', `Bearer ${restaurant.token}`)
+      .send({ code: 'MULTI5', discountDescription: '5% off' });
+
+    const first = await request(app).post('/promo-codes/redeem').send({ code: 'MULTI5' });
+    const second = await request(app).post('/promo-codes/redeem').send({ code: 'MULTI5' });
+    const third = await request(app).post('/promo-codes/redeem').send({ code: 'MULTI5' });
+    expect([first.status, second.status, third.status]).toEqual([201, 201, 201]);
+
+    const stats = await request(app)
+      .get('/promo-codes/MULTI5/stats')
+      .set('Authorization', `Bearer ${restaurant.token}`);
+    expect(stats.body.redemptionCount).toBe(3);
+    expect(stats.body.redemptions).toHaveLength(3);
+  });
+
+  it('records the redeeming business when the redeemer is logged in', async () => {
+    const restaurant = await signup('promologgedincreator');
+    await request(app)
+      .post('/promo-codes')
+      .set('Authorization', `Bearer ${restaurant.token}`)
+      .send({ code: 'LOGGEDIN7', discountDescription: '7% off' });
+    const redeemer = await signup('promologgedinredeemer', { isRestaurant: false });
+
+    await request(app)
+      .post('/promo-codes/redeem')
+      .set('Authorization', `Bearer ${redeemer.token}`)
+      .send({ code: 'LOGGEDIN7' });
+
+    const promoCode = await prisma.promoCode.findUnique({ where: { code: 'LOGGEDIN7' } });
+    const redemptions = await prisma.redemption.findMany({ where: { promoCodeId: promoCode!.id } });
+    expect(redemptions).toHaveLength(1);
+    expect(redemptions[0].userId).toBe(redeemer.business.id);
+  });
+
+  it("blocks a restaurant from viewing another restaurant's promo code stats", async () => {
+    const owner = await signup('promoownerstats');
+    await request(app)
+      .post('/promo-codes')
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ code: 'PRIVATE9', discountDescription: '9% off' });
+    const intruder = await signup('promointruderstats');
+
+    const res = await request(app)
+      .get('/promo-codes/PRIVATE9/stats')
+      .set('Authorization', `Bearer ${intruder.token}`);
+    expect(res.status).toBe(403);
+  });
+
+  it('404s stats for a promo code that does not exist', async () => {
+    const restaurant = await signup('promo404creator');
+    const res = await request(app)
+      .get('/promo-codes/NOPE123/stats')
+      .set('Authorization', `Bearer ${restaurant.token}`);
+    expect(res.status).toBe(404);
+  });
+
+  it('requires auth to view promo code stats', async () => {
+    const restaurant = await signup('promonoauthcreator');
+    await request(app)
+      .post('/promo-codes')
+      .set('Authorization', `Bearer ${restaurant.token}`)
+      .send({ code: 'NOAUTH1', discountDescription: '1% off' });
+
+    const res = await request(app).get('/promo-codes/NOAUTH1/stats');
+    expect(res.status).toBe(401);
+  });
+
+  it('deleting a restaurant account cleans up its promo codes and redemptions without error', async () => {
+    const restaurant = await signup('promodeletecreator');
+    await request(app)
+      .post('/promo-codes')
+      .set('Authorization', `Bearer ${restaurant.token}`)
+      .send({ code: 'DELETEME1', discountDescription: '1% off' });
+    await request(app).post('/promo-codes/redeem').send({ code: 'DELETEME1' });
+
+    const del = await request(app).delete('/businesses/me').set('Authorization', `Bearer ${restaurant.token}`);
+    expect(del.status).toBe(200);
+
+    const promoCode = await prisma.promoCode.findUnique({ where: { code: 'DELETEME1' } });
+    expect(promoCode).toBeNull();
+  });
+
+  // --- Reliability ---
+
+  it('GET /health reports healthy when the database is reachable', async () => {
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true, db: 'connected' });
+  });
+
+  it('GET /health reports 503 when the database is unreachable', async () => {
+    const spy = jest.spyOn(prisma, '$queryRaw').mockRejectedValueOnce(new Error('connection refused'));
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({ ok: false, db: 'unreachable' });
+    spy.mockRestore();
+  });
+
+  it('turns an unexpected async error (e.g. a dropped DB call) into a structured 500, not a hang or a leaked stack trace', async () => {
+    // GET /cuisines has no try/catch of its own — a genuine unhandled-rejection scenario
+    // for Express 4 without express-async-errors. Confirms the fix actually reaches
+    // routes, not just ones that happen to already catch their own errors (like requireAuth).
+    const spy = jest
+      .spyOn(prisma.cuisine, 'findMany')
+      .mockRejectedValueOnce(new Error('Connection terminated unexpectedly: password authentication failed for user "postgres"'));
+
+    const res = await request(app).get('/cuisines');
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'Internal server error' });
+    expect(JSON.stringify(res.body)).not.toContain('password authentication failed');
+    spy.mockRestore();
+  });
+
+  // --- Security: input validation hardening ---
+
+  it('rejects signup with an absurdly long password', async () => {
+    const res = await request(app).post('/auth/signup').send({
+      email: 'longpw@test.com',
+      password: 'a'.repeat(500),
+      name: 'Long Password Co',
+      handle: 'longpwco',
+      city: 'Testville',
+      category: 'Testing',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a menu item price of Infinity or an unreasonably large number', async () => {
+    const { token } = await signup('menuvalidation');
+    const infinite = await request(app)
+      .patch('/businesses/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ menuItems: [{ name: 'Broken Item', price: Infinity }] });
+    expect(infinite.status).toBe(400);
+
+    const tooLarge = await request(app)
+      .patch('/businesses/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ menuItems: [{ name: 'Broken Item', price: 99999999 }] });
+    expect(tooLarge.status).toBe(400);
+  });
+
+  it('rejects an oversized cuisineSlug on signup and on profile update', async () => {
+    const signupRes = await request(app).post('/auth/signup').send({
+      email: 'bigcuisine@test.com',
+      password: 'password123',
+      name: 'Big Cuisine Co',
+      handle: 'bigcuisineco',
+      city: 'Testville',
+      isRestaurant: true,
+      cuisineSlug: 'x'.repeat(200),
+    });
+    expect(signupRes.status).toBe(400);
+
+    const { token } = await signup('bigcuisineupdate');
+    const updateRes = await request(app)
+      .patch('/businesses/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ cuisineSlug: 'x'.repeat(200) });
+    expect(updateRes.status).toBe(400);
+  });
+
+  // --- Security: auth token expiry ---
+  // Note: this codebase has no refresh-token flow — signToken() issues a single 30-day
+  // JWT with no rotation/renewal mechanism; the only way to get a new one is to log in
+  // again. These tests cover the expiry behavior that actually exists, signing tokens
+  // directly with the same secret the test environment uses (see tests/setupEnv.ts)
+  // rather than waiting 30 real days.
+
+  it('accepts a token that is still within its 30-day life', async () => {
+    const { business } = await signup('validtokentest');
+    const notYetExpiredToken = jwt.sign({ sub: business.id, mid: null }, 'test-secret', { expiresIn: '29d' });
+    const res = await request(app).get('/auth/me').set('Authorization', `Bearer ${notYetExpiredToken}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('rejects a token once it has expired', async () => {
+    const { business } = await signup('expiredtokentest');
+    const expiredToken = jwt.sign({ sub: business.id, mid: null }, 'test-secret', { expiresIn: '-10s' });
+    const res = await request(app).get('/auth/me').set('Authorization', `Bearer ${expiredToken}`);
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a token signed with the wrong secret', async () => {
+    const { business } = await signup('wrongsecrettest');
+    const forgedToken = jwt.sign({ sub: business.id, mid: null }, 'not-the-real-secret', { expiresIn: '30d' });
+    const res = await request(app).get('/auth/me').set('Authorization', `Bearer ${forgedToken}`);
+    expect(res.status).toBe(401);
+  });
+
+  // --- Observability: structured logging around the city-lock filter ---
+
+  function readStructuredLogEvents(spy: jest.SpyInstance, event: string): Record<string, unknown>[] {
+    return spy.mock.calls
+      .map(([line]) => {
+        try {
+          return JSON.parse(line as string);
+        } catch {
+          return null;
+        }
+      })
+      .filter((parsed): parsed is Record<string, unknown> => Boolean(parsed) && parsed!.event === event);
+  }
+
+  it('logs a structured feed.city_lock event with real match/mismatch counts', async () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    const cityA = await signup('logcitya', { city: 'Logtown' });
+    const cityB = await signup('logcityb', { city: 'Othertown' });
+    await createPost(cityA.token, { caption: 'Logtown post' });
+    await createPost(cityB.token, { caption: 'Othertown post' });
+    const viewer = await signup('logviewer', { city: 'Logtown', isRestaurant: false });
+
+    logSpy.mockClear();
+    const res = await request(app).get('/posts/feed?tab=forYou').set('Authorization', `Bearer ${viewer.token}`);
+    expect(res.status).toBe(200);
+
+    const events = readStructuredLogEvents(logSpy, 'feed.city_lock');
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      level: 'info',
+      viewerCity: 'Logtown',
+      matchedCount: 1,
+    });
+    expect(typeof events[0].totalEligiblePlatformWide).toBe('number');
+    expect(events[0].totalEligiblePlatformWide as number).toBeGreaterThanOrEqual(2);
+    expect(events[0].mismatchCount).toBe((events[0].totalEligiblePlatformWide as number) - 1);
+
+    logSpy.mockRestore();
+  });
+
+  // --- Edge cases ---
+
+  it('accepts a post whose video is malformed (undecodable), falling back to the untranscoded original rather than rejecting it', async () => {
+    const { token } = await signup('malformedvideo');
+    const garbage = Buffer.from('this is not a real video file, just bytes claiming to be one');
+    const res = await request(app)
+      .post('/posts')
+      .set('Authorization', `Bearer ${token}`)
+      .field('caption', 'A video that is not actually a video')
+      .field('tag', 'Culture')
+      .attach('media', garbage, { filename: 'fake.mp4', contentType: 'video/mp4' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.post.mediaType).toBe('video');
+    // Fell back to the raw upload — never got a "-web.mp4" transcoded name.
+    expect(res.body.post.mediaUrl).not.toMatch(/-web\.mp4$/);
+  }, 15000);
+
+  it('rejects an oversized upload with 400, not a 500 or a hang', async () => {
+    const { token } = await signup('oversizedupload');
+    const oversized = Buffer.alloc(51 * 1024 * 1024); // over the 50MB limit in upload.ts
+    const res = await request(app)
+      .post('/posts')
+      .set('Authorization', `Bearer ${token}`)
+      .field('caption', 'Way too big')
+      .field('tag', 'Culture')
+      .attach('media', oversized, { filename: 'huge.mp4', contentType: 'video/mp4' });
+
+    expect(res.status).toBe(400);
+  }, 20000);
+
+  it('rejects an upload whose declared mimetype is neither image nor video', async () => {
+    const { token } = await signup('wrongmimetype');
+    const res = await request(app)
+      .post('/posts')
+      .set('Authorization', `Bearer ${token}`)
+      .field('caption', 'A PDF, not media')
+      .field('tag', 'Culture')
+      .attach('media', Buffer.from('%PDF-1.4 not really'), { filename: 'doc.pdf', contentType: 'application/pdf' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('shows an empty result (not another city\'s posts) when the cuisine filter matches nothing in the viewer\'s own city', async () => {
+    const restaurant = await signup('zeromatchcuisine', { city: 'Zerotown', cuisineSlug: 'italian' });
+    await createPost(restaurant.token, { caption: 'Italian food in Zerotown' });
+    const viewer = await signup('zeromatchviewer', { city: 'Zerotown', isRestaurant: false });
+
+    // Zerotown has an Italian restaurant but no Thai one — filtering by Thai should come
+    // back empty, not silently fall back to showing the Italian posts or another city's.
+    const res = await request(app)
+      .get('/posts/feed?tab=forYou&cuisine=thai')
+      .set('Authorization', `Bearer ${viewer.token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.posts).toEqual([]);
+    expect(res.body.city).toBe('Zerotown');
   });
 });

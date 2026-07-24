@@ -98,6 +98,13 @@ export function BusinessProfileContent({ business, posts, headerAction, moreActi
               </Pressable>
             )}
 
+            {business.isMe && business.isRestaurant && (
+              <Pressable style={styles.analyticsButton} onPress={() => navigation.navigate('PromoCodes')}>
+                <Icon name="star" color={colors.gradientGoldEnd} size={16} />
+                <Text style={styles.analyticsButtonText}>Promo Codes</Text>
+              </Pressable>
+            )}
+
             <View style={styles.tabsRow}>
               <Pressable onPress={() => setTab('posts')}>
                 <Text style={[styles.tabLabel, tab === 'posts' && styles.tabLabelActive]}>Posts</Text>

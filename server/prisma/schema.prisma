@@ -56,8 +56,42 @@ model Business {
   reportsFiled    Report[]
   stories         Story[]
   storyViews      StoryView[]
+  promoCodes      PromoCode[]
+  redemptions     Redemption[]
 
   @@index([isRestaurant, city])
+}
+
+// Discount-code redemption tracking. One restaurant can issue multiple codes; a code is
+// redeemed by entering it (no login required, e.g. at checkout in person), and each
+// redemption is logged. Duplicate redemptions of the same code ARE allowed by design: a
+// single code is meant to be shared across many customers (this isn't a one-time-use
+// coupon per person), and since redemption doesn't require login there's no reliable
+// identity to dedupe against anyway. `active` is the restaurant's only on/off switch —
+// there's no separate expiry timestamp in this model.
+model PromoCode {
+  id                  String   @id @default(cuid())
+  code                String   @unique
+  restaurantId        String
+  restaurant          Business @relation(fields: [restaurantId], references: [id])
+  discountDescription String
+  createdAt           DateTime @default(now())
+  active              Boolean  @default(true)
+
+  redemptions Redemption[]
+
+  @@index([restaurantId])
+}
+
+model Redemption {
+  id          String    @id @default(cuid())
+  promoCodeId String
+  promoCode   PromoCode @relation(fields: [promoCodeId], references: [id])
+  redeemedAt  DateTime  @default(now())
+  userId      String?
+  user        Business? @relation(fields: [userId], references: [id])
+
+  @@index([promoCodeId])
 }
 
 // Fixed cuisine taxonomy — a lookup table, not free text, so filtering/search stays

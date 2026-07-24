@@ -19,7 +19,10 @@ export const authRouter = Router();
 const signupSchema = z
   .object({
     email: emailSchema,
-    password: z.string().min(8, 'Password must be at least 8 characters'),
+    // bcrypt (via bcryptjs) silently truncates at 72 bytes, so an unbounded password isn't
+    // a crackable-weaker-hash risk — the cap is purely to reject an absurdly large request
+    // body before it does any work.
+    password: z.string().min(8, 'Password must be at least 8 characters').max(200, 'Password is too long'),
     name: z.string().min(2).max(80),
     handle: z
       .string()
@@ -30,7 +33,7 @@ const signupSchema = z
     category: z.string().min(2).max(60).optional(),
     bio: z.string().max(280).optional().default(''),
     isRestaurant: z.boolean().optional().default(false),
-    cuisineSlug: z.string().min(1).optional(),
+    cuisineSlug: z.string().min(1).max(50).optional(),
   })
   .refine((data) => data.isRestaurant === false || Boolean(data.cuisineSlug), {
     message: 'Cuisine type is required for a restaurant account',

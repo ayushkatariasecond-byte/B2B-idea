@@ -11,6 +11,7 @@ import { transcodeVideo } from '../utils/videoTranscode';
 import { persistUpload } from '../storage';
 import { recencyBoost, velocityBoost, explorationJitter, currentHourBucket, diversify } from '../utils/ranking';
 import { containsBlockedContent } from '../utils/moderation';
+import { logger } from '../utils/logger';
 
 export const postsRouter = Router();
 
@@ -73,7 +74,7 @@ postsRouter.get('/feed', optionalAuth, async (req: AuthedRequest, res) => {
   const viewer = await prisma.business.findUnique({ where: { id: req.businessId }, select: { city: true } });
   const viewerCity = viewer?.city ?? '';
 
-  const cuisineSlug = typeof req.query.cuisine === 'string' ? req.query.cuisine : undefined;
+  const cuisineSlug = typeof req.query.cuisine === 'string' ? req.query.cuisine.slice(0, 50) : undefined;
   let cuisineId: string | undefined;
   if (cuisineSlug) {
     const cuisine = await prisma.cuisine.findUnique({ where: { slug: cuisineSlug } });
@@ -95,6 +96,24 @@ postsRouter.get('/feed', optionalAuth, async (req: AuthedRequest, res) => {
     orderBy: { createdAt: 'desc' },
     take: 300,
     include: postInclude(req.businessId),
+  });
+
+  // Structured logging around the city-lock specifically — per the hardening pass, this
+  // is the core untested-in-production logic (everything else here is either read-only
+  // browsing or protected by auth). One extra lightweight COUNT alongside the real query,
+  // so each log line shows not just "how many posts this viewer got" but the filter's
+  // actual impact: how many eligible restaurant posts exist platform-wide vs. how many
+  // were in this viewer's own city.
+  const totalEligiblePlatformWide = await prisma.post.count({
+    where: { ...visibilityWhere(), businessId: { notIn: excluded }, business: { isRestaurant: true } },
+  });
+  logger.info('feed.city_lock', {
+    viewerId: req.businessId,
+    viewerCity,
+    cuisineFilter: cuisineSlug ?? null,
+    matchedCount: all.length,
+    mismatchCount: totalEligiblePlatformWide - all.length,
+    totalEligiblePlatformWide,
   });
 
   if (all.length === 0) {
@@ -164,9 +183,13 @@ postsRouter.get('/feed', optionalAuth, async (req: AuthedRequest, res) => {
 });
 
 postsRouter.get('/discover', optionalAuth, async (req: AuthedRequest, res) => {
-  const tag = typeof req.query.tag === 'string' && req.query.tag !== 'Trending' ? req.query.tag : undefined;
-  const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
-  const hashtag = typeof req.query.hashtag === 'string' ? req.query.hashtag.toLowerCase().replace(/^#/, '') : undefined;
+  // Each capped defensively — none of these have any legitimate reason to be long, and an
+  // unbounded value sitting in a `contains`/equality filter is needless attack surface.
+  const tag =
+    typeof req.query.tag === 'string' && req.query.tag !== 'Trending' ? req.query.tag.slice(0, 40) : undefined;
+  const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : '';
+  const hashtag =
+    typeof req.query.hashtag === 'string' ? req.query.hashtag.toLowerCase().replace(/^#/, '').slice(0, 100) : undefined;
   const excluded = await getExcludedBusinessIds(req.businessId);
 
   const where: Record<string, unknown> = { ...visibilityWhere(), businessId: { notIn: excluded } };

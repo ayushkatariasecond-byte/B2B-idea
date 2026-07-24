@@ -24,19 +24,31 @@ export const corsMiddleware = cors(
 const skip = () => env.nodeEnv === 'test';
 
 // Brute-force protection for credentials + account recovery (login, signup, forgot/reset).
+// Both limiters key by IP (express-rate-limit's default) — there's no authenticated
+// identity yet at signup/login time to key by instead. That matters for this app
+// specifically: a real-world test recruits ~20-50 people who are plausibly all testing
+// from the same location (e.g. the restaurant itself), which usually means one shared
+// public IP behind NAT. The original 40/15min ceiling was sized for "one person retrying
+// a login," not "50 legitimate people signing up within the same few minutes from behind
+// one router" — at 40, roughly the second half of a 50-person group signing up together
+// would get incorrectly throttled. Raised to comfortably cover that scale while still
+// being far below what a scripted brute-force attempt would actually want.
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 40,
+  limit: 100,
   skip,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many attempts. Please wait a few minutes and try again.' },
 });
 
-// A generous ceiling on the rest of the API to blunt floods without affecting normal use.
+// Same shared-IP reasoning as authLimiter above, applied to general traffic: 600/min
+// works out to 12/min per person if split evenly across 50 concurrent users on one IP,
+// which real usage (feed scrolling triggers a view-tracking call per post, plus likes/
+// profile loads) can burst past. Raised to keep normal browsing from tripping this.
 export const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 600,
+  limit: 1200,
   skip,
   standardHeaders: true,
   legacyHeaders: false,

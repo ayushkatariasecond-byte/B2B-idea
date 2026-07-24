@@ -15,6 +15,7 @@ export type RootStackParamList = {
   FollowList: { businessId: string; mode: 'followers' | 'following'; name?: string };
   EditProfile: undefined;
   Analytics: undefined;
+  PromoCodes: undefined;
   Thread: { threadId: string; otherName: string };
   Notifications: undefined;
   Drafts: undefined;

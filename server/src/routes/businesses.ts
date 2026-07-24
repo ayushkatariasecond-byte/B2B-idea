@@ -39,7 +39,10 @@ async function withStats(businessId: string, viewerId?: string) {
 }
 
 businessesRouter.get('/search', optionalAuth, async (req, res) => {
-  const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  // Capped defensively before it ever reaches a query — a search box has no legitimate
+  // reason to send a multi-KB string, and this is one less unbounded value in a `contains`
+  // filter.
+  const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : '';
   if (!q) return res.json({ businesses: [] });
   const businesses = await prisma.business.findMany({
     where: { OR: [{ name: { contains: q } }, { handle: { contains: q } }] },
@@ -80,7 +83,9 @@ businessesRouter.get('/handle/:handle', optionalAuth, async (req: AuthedRequest,
 
 const menuItemSchema = z.object({
   name: z.string().min(1).max(80),
-  price: z.number().nonnegative(),
+  // .finite() matters here: z.number() alone accepts Infinity (it only rejects NaN by
+  // default), and nonnegative() doesn't stop Infinity either since Infinity >= 0 is true.
+  price: z.number().finite().nonnegative().max(100000, 'Price is unreasonably large'),
   description: z.string().max(200).optional(),
 });
 
@@ -90,7 +95,7 @@ const updateSchema = z.object({
   bio: z.string().max(280).optional(),
   city: z.string().min(1).max(80).optional(),
   website: z.union([z.string().url().max(300), z.literal('')]).optional(),
-  cuisineSlug: z.string().min(1).optional(),
+  cuisineSlug: z.string().min(1).max(50).optional(),
   // Full-replace, matching the update-your-whole-menu-at-once pattern this route already
   // uses elsewhere for small collections — no per-item CRUD endpoints for a flat list this size.
   menuItems: z.array(menuItemSchema).max(100).optional(),
@@ -187,6 +192,14 @@ businessesRouter.delete('/me', requireAuth, requireOwner, async (req: AuthedRequ
     prisma.message.deleteMany({ where: { senderId: businessId } }),
     prisma.postHashtag.deleteMany({ where: { post: { businessId } } }),
     prisma.post.deleteMany({ where: { businessId } }),
+    // Redemptions this business made (as a logged-in redeemer, via userId) and redemptions
+    // against promo codes this business owns (as a restaurant) both reference Business —
+    // both have to go before the promo codes themselves, and the promo codes before the
+    // business row. See the PromoCode/Redemption schema comment for the cascade-delete
+    // rationale (deliberately app-level, matching every other relation cleaned up above).
+    prisma.redemption.deleteMany({ where: { userId: businessId } }),
+    prisma.redemption.deleteMany({ where: { promoCode: { restaurantId: businessId } } }),
+    prisma.promoCode.deleteMany({ where: { restaurantId: businessId } }),
     prisma.business.delete({ where: { id: businessId } }),
   ]);
   res.json({ ok: true });
