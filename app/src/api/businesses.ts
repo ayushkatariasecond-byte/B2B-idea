@@ -15,6 +15,9 @@ export function updateMe(input: {
   category?: string;
   bio?: string;
   city?: string;
+  /** Sent as a pair, only when the user grants the location permission. */
+  latitude?: number;
+  longitude?: number;
   website?: string;
   cuisineSlug?: string;
   menuItems?: MenuItem[];
@@ -35,6 +38,42 @@ async function uploadImage(path: string, input: { uri: string; fileName: string;
     form.append('media', { uri: input.uri, name: input.fileName, type: input.mimeType } as unknown as Blob);
   }
   return api.postForm<{ business: Business }>(path, form);
+}
+
+/** Fire-and-forget: a failed analytics ping must never interrupt the user actually
+ *  getting to the restaurant's site, so callers intentionally don't await or surface this. */
+export function logLinkClick(businessId: string) {
+  return api.post<{ ok: boolean }>(`/businesses/${businessId}/link-click`, {});
+}
+
+export interface NearbyRestaurant {
+  id: string;
+  name: string;
+  handle: string;
+  avatarUrl: string | null;
+  cuisine: { id: string; name: string; slug: string } | null;
+  latitude: number;
+  longitude: number;
+  distanceMiles: number | null;
+}
+
+export function getNearbyRestaurants() {
+  return api.get<{
+    restaurants: NearbyRestaurant[];
+    city: string;
+    radiusMiles: number;
+    viewerHasLocation: boolean;
+    center: { latitude: number; longitude: number } | null;
+  }>('/businesses/nearby');
+}
+
+export function getLinkClickStats() {
+  return api.get<{
+    totalClicks: number;
+    clicks30d: number;
+    clicksPrev30d: number;
+    recentClicks: string[];
+  }>('/businesses/me/link-clicks');
 }
 
 export const updateAvatar = (input: { uri: string; fileName: string; mimeType: string }) => uploadImage('/businesses/me/avatar', input);

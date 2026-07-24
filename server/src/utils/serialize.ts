@@ -15,6 +15,8 @@ type BusinessLike = {
   emailVerified?: boolean;
   createdAt: Date;
   city?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   isRestaurant?: boolean;
   website?: string | null;
   cuisine?: CuisineLike | null;
@@ -35,6 +37,13 @@ export function serializeBusiness(b: BusinessLike, extra: Record<string, unknown
     emailVerified: b.emailVerified ?? false,
     createdAt: b.createdAt,
     city: b.city ?? '',
+    // Deliberately a boolean, NOT the coordinates themselves. This serializer is used for
+    // every account including plain viewers, and a viewer's latitude/longitude is their
+    // home location — publishing that on a profile any stranger can fetch would be a real
+    // privacy leak. The client only needs to know whether to offer the "enable location"
+    // prompt. Restaurant pin coordinates are served separately and deliberately coarsened
+    // by the map endpoint (see routes/businesses.ts `/nearby`).
+    hasLocation: b.latitude != null && b.longitude != null,
     isRestaurant: b.isRestaurant ?? false,
     website: b.website ?? null,
     cuisine: b.cuisine ?? null,

@@ -80,6 +80,11 @@ export function AnalyticsScreen({ navigation }: Props) {
             <Text style={styles.statCardValue}>{data.engagementPct}%</Text>
             <Text style={styles.statCardDelta}>{deltaLabel(data.engagementDeltaPts, 'pt')}</Text>
           </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statCardLabel}>Link taps (30d)</Text>
+            <Text style={styles.statCardValue}>{data.linkClicks30d.toLocaleString()}</Text>
+            <Text style={styles.statCardDelta}>{deltaLabel(data.linkClicksDeltaPct, '%')}</Text>
+          </View>
         </View>
 
         <LinearGradient

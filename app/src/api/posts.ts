@@ -102,9 +102,14 @@ export function recordShare(postId: string) {
 }
 
 export function getComments(postId: string) {
-  return api.get<{ comments: Comment[] }>(`/posts/${postId}/comments`);
+  return api.get<{ comments: Comment[]; openReplyCount: number }>(`/posts/${postId}/comments`);
 }
 
-export function addComment(postId: string, text: string) {
-  return api.post<{ comment: Comment }>(`/posts/${postId}/comments`, { text });
+/** Owner-only: clears a question from the post's open-questions indicator. */
+export function markReplyAnswered(postId: string, commentId: string) {
+  return api.post<{ comment: Comment }>(`/posts/${postId}/comments/${commentId}/answered`, {});
+}
+
+export function addComment(postId: string, text: string, isReply = false) {
+  return api.post<{ comment: Comment }>(`/posts/${postId}/comments`, { text, isReply });
 }

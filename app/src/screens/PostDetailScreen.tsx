@@ -52,6 +52,11 @@ export function PostDetailScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [askMode, setAskMode] = useState(false);
+  const [openReplyCount, setOpenReplyCount] = useState(0);
+
+  // The post's own restaurant — they see the questions indicator and can mark answered.
+  const isPostOwner = Boolean(post && me && post.businessId === me.id);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,6 +66,7 @@ export function PostDetailScreen({ route, navigation }: Props) {
       setPost(postRes.post);
       setSaved(postRes.post.savedByMe);
       setComments(commentsRes.comments);
+      setOpenReplyCount(commentsRes.openReplyCount ?? 0);
       postsApi.recordView(postId).catch(() => undefined);
     } catch {
       setError("Couldn't load this post. Check your connection and try again.");
@@ -99,13 +105,22 @@ export function PostDetailScreen({ route, navigation }: Props) {
       if (!commentText.trim() || !post) return;
       setSending(true);
       try {
-        const res = await postsApi.addComment(post.id, commentText.trim());
+        const res = await postsApi.addComment(post.id, commentText.trim(), askMode);
         setComments((prev) => [...prev, res.comment]);
         setPost({ ...post, commentCount: post.commentCount + 1 });
         setCommentText('');
+        setAskMode(false);
       } finally {
         setSending(false);
       }
+    });
+
+  const markAnswered = (comment: Comment) =>
+    requireLogin(async () => {
+      if (!post) return;
+      const res = await postsApi.markReplyAnswered(post.id, comment.id);
+      setComments((prev) => prev.map((c) => (c.id === comment.id ? res.comment : c)));
+      setOpenReplyCount((n) => Math.max(0, n - 1));
     });
 
   const removeComment = (comment: Comment) =>
@@ -196,18 +211,41 @@ export function PostDetailScreen({ route, navigation }: Props) {
           </View>
         </View>
 
+        {/* Only the restaurant sees this — it's their inbox indicator, and the server
+            already sorts their unanswered questions to the top of the list below. */}
+        {isPostOwner && openReplyCount > 0 && (
+          <View style={styles.questionsBanner}>
+            <Text style={styles.questionsBannerText}>
+              {openReplyCount === 1 ? '1 question needs an answer' : `${openReplyCount} questions need an answer`}
+            </Text>
+          </View>
+        )}
+
         <FlatList
           data={comments}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.commentList}
           renderItem={({ item }) => {
             const canDelete = me && (me.id === item.business.id || me.id === post.businessId);
+            const isOpenQuestion = item.isReply && !item.answered;
             return (
-              <View style={styles.commentRow}>
+              <View style={[styles.commentRow, isOpenQuestion && styles.commentRowQuestion]}>
                 <CommentAvatar uri={item.business.avatarUrl} name={item.business.name} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.commentWho}>{item.business.name}</Text>
+                  <View style={styles.commentWhoRow}>
+                    <Text style={styles.commentWho}>{item.business.name}</Text>
+                    {item.isReply && (
+                      <Text style={[styles.questionTag, item.answered && styles.questionTagAnswered]}>
+                        {item.answered ? 'Answered' : 'Question'}
+                      </Text>
+                    )}
+                  </View>
                   <Text style={styles.commentText}>{item.text}</Text>
+                  {isPostOwner && isOpenQuestion && (
+                    <Pressable onPress={() => markAnswered(item)} hitSlop={6} accessibilityRole="button">
+                      <Text style={styles.markAnsweredText}>Mark as answered</Text>
+                    </Pressable>
+                  )}
                 </View>
                 {canDelete && (
                   <Pressable onPress={() => removeComment(item)} hitSlop={8} accessibilityLabel="Delete comment" accessibilityRole="button">
@@ -220,10 +258,26 @@ export function PostDetailScreen({ route, navigation }: Props) {
           ListEmptyComponent={<Text style={styles.emptyComments}>Be the first to comment.</Text>}
         />
 
+        {/* Hidden for the restaurant's own post — they answer questions, they don't ask
+            themselves one. Everyone else can flag a comment as a question. */}
+        {!isPostOwner && (
+          <Pressable
+            onPress={() => setAskMode((v) => !v)}
+            style={styles.askToggleRow}
+            accessibilityRole="button"
+            accessibilityState={{ selected: askMode }}
+          >
+            <View style={[styles.askCheckbox, askMode && styles.askCheckboxOn]}>
+              {askMode && <Text style={styles.askCheckboxMark}>✓</Text>}
+            </View>
+            <Text style={styles.askToggleLabel}>Ask the restaurant a question</Text>
+          </Pressable>
+        )}
+
         <View style={styles.inputBar}>
           <TextInput
             style={styles.commentInput}
-            placeholder="Add a comment..."
+            placeholder={askMode ? 'Ask about hours, allergens, the menu...' : 'Add a comment...'}
             placeholderTextColor={colors.inkMuted}
             value={commentText}
             onChangeText={setCommentText}
@@ -289,6 +343,52 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 11, color: colors.inkFaint, fontFamily: fonts.body.medium },
   commentList: { padding: 18, gap: 16, flexGrow: 1 },
   commentRow: { flexDirection: 'row', gap: 11, alignItems: 'flex-start' },
+  commentRowQuestion: {
+    backgroundColor: colors.bannerGoldBg,
+    borderRadius: radius.smd,
+    padding: 10,
+    marginHorizontal: -10,
+  },
+  commentWhoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  questionTag: {
+    fontSize: 10,
+    fontFamily: fonts.body.extraBold,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    color: colors.bannerGoldTitle,
+  },
+  questionTagAnswered: { color: colors.inkFaint2 },
+  markAnsweredText: { marginTop: 6, fontSize: 12, fontFamily: fonts.body.bold, color: colors.gold },
+  questionsBanner: {
+    backgroundColor: colors.bannerGoldBg,
+    borderWidth: 1,
+    borderColor: colors.bannerGoldBorder,
+    borderRadius: radius.smd,
+    paddingVertical: 9,
+    paddingHorizontal: 13,
+    marginHorizontal: 16,
+    marginBottom: 4,
+  },
+  questionsBannerText: { fontSize: 13, fontFamily: fonts.body.bold, color: colors.bannerGoldTitle },
+  askToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  askCheckbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  askCheckboxOn: { backgroundColor: colors.gold, borderColor: colors.gold },
+  askCheckboxMark: { color: colors.white, fontSize: 11, fontFamily: fonts.body.extraBold, lineHeight: 14 },
+  askToggleLabel: { fontSize: 13, fontFamily: fonts.body.medium, color: colors.inkSoft },
   avatarRing: { width: 34, height: 34, borderRadius: 17, padding: 2, alignItems: 'center', justifyContent: 'center' },
   avatarRingInner: {
     width: 30,

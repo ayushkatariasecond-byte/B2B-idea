@@ -8,6 +8,7 @@ import { emailSchema } from '../utils/email';
 import { env } from '../env';
 import { sendWelcomeEmail, sendPasswordResetEmail, sendVerifyEmail } from '../email';
 import { makeResetToken, readResetSubject, verifyResetToken, makeVerifyToken, verifyVerifyToken } from '../authTokens';
+import { hasCoords } from '../utils/geo';
 
 export const authRouter = Router();
 
@@ -30,6 +31,12 @@ const signupSchema = z
       .max(30)
       .regex(/^[a-z0-9_]+$/, 'Handle can only contain lowercase letters, numbers, and underscores'),
     city: z.string().min(1, 'City is required').max(80),
+    // Optional on purpose: the client sends these only when the user granted the location
+    // permission. Declining is a supported path (the account falls back to city matching),
+    // so a missing pair must not fail validation. Bounds are enforced here rather than
+    // trusted from the device.
+    latitude: z.number().finite().min(-90).max(90).optional(),
+    longitude: z.number().finite().min(-180).max(180).optional(),
     category: z.string().min(2).max(60).optional(),
     bio: z.string().max(280).optional().default(''),
     isRestaurant: z.boolean().optional().default(false),
@@ -49,7 +56,7 @@ authRouter.post('/signup', async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' });
   }
-  const { email, password, name, handle, city, bio, isRestaurant, cuisineSlug } = parsed.data;
+  const { email, password, name, handle, city, bio, isRestaurant, cuisineSlug, latitude, longitude } = parsed.data;
 
   const existingEmail = await prisma.business.findUnique({ where: { email } });
   if (existingEmail) return res.status(409).json({ error: 'An account with this email already exists' });
@@ -75,6 +82,10 @@ authRouter.post('/signup', async (req, res) => {
       isRestaurant,
       category: isRestaurant ? cuisine!.name : parsed.data.category!,
       cuisineId: cuisine?.id ?? null,
+      // Only stored when the client actually sent a usable pair — a partial or
+      // out-of-range pair is left null so it falls into the city-matching path rather
+      // than becoming a coordinate that silently matches the wrong restaurants.
+      ...(hasCoords({ latitude, longitude }) ? { latitude, longitude } : {}),
     },
     include: { cuisine: true },
   });

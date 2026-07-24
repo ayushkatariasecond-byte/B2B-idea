@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { ApiError } from '../api/client';
 import * as businessesApi from '../api/businesses';
 import { Cuisine } from '../api/types';
+import { useLocationPermission, Coords } from '../hooks/useLocationPermission';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Signup'>;
 
@@ -26,6 +27,13 @@ export function SignupScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [coords, setCoords] = useState<Coords | null>(null);
+  const { status: locationStatus, request: requestLocation } = useLocationPermission();
+
+  const onUseLocation = async () => {
+    const result = await requestLocation();
+    if (result) setCoords(result);
+  };
 
   useEffect(() => {
     businessesApi.getCuisines().then((res) => {
@@ -57,6 +65,9 @@ export function SignupScreen({ navigation }: Props) {
         email: email.trim(),
         password,
         isRestaurant,
+        // Only included when the user actually granted permission — omitting them puts
+        // the account on the city-matching fallback path rather than failing signup.
+        ...(coords ? { latitude: coords.latitude, longitude: coords.longitude } : {}),
         ...(isRestaurant ? { cuisineSlug: cuisineSlug! } : { category: category.trim() }),
       });
     } catch (e) {
@@ -87,6 +98,37 @@ export function SignupScreen({ navigation }: Props) {
           />
           <TextField label="Handle" placeholder="franklinsfirehouse" value={handle} onChangeText={setHandle} />
           <TextField label="City" placeholder="Austin" value={city} onChangeText={setCity} autoCapitalize="words" />
+
+          {/* Location is an enhancement on top of the city field, never a replacement for
+              it — the city stays required so declining (or a device with no fix) still
+              produces a working account. */}
+          <View style={styles.locationBox}>
+            {locationStatus === 'granted' && coords ? (
+              <Text style={styles.locationOn}>
+                ✓ Using your location — you&apos;ll see restaurants within 20 miles.
+              </Text>
+            ) : (
+              <>
+                <Text style={styles.locationLabel}>
+                  {isRestaurant
+                    ? 'Add your location so nearby diners can find you.'
+                    : 'Use your location to find restaurants near you.'}
+                </Text>
+                <Text
+                  style={[styles.locationAction, locationStatus === 'requesting' && styles.locationActionDisabled]}
+                  onPress={locationStatus === 'requesting' ? undefined : onUseLocation}
+                  accessibilityRole="button"
+                >
+                  {locationStatus === 'requesting' ? 'Getting location…' : 'Use my location'}
+                </Text>
+                {(locationStatus === 'denied' || locationStatus === 'unavailable') && (
+                  <Text style={styles.locationFallback}>
+                    No problem — we&apos;ll use the city you entered above instead.
+                  </Text>
+                )}
+              </>
+            )}
+          </View>
 
           {isRestaurant ? (
             <View style={styles.field}>
@@ -133,6 +175,17 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body.bold,
   },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  locationBox: {
+    backgroundColor: colors.paper2,
+    borderRadius: 12,
+    padding: 14,
+    gap: 6,
+  },
+  locationLabel: { fontFamily: fonts.body.regular, fontSize: 13, color: colors.inkSoft, lineHeight: 18 },
+  locationAction: { fontFamily: fonts.body.bold, fontSize: 14, color: colors.gold },
+  locationActionDisabled: { color: colors.inkFaint2 },
+  locationOn: { fontFamily: fonts.body.semiBold, fontSize: 13, color: colors.green, lineHeight: 18 },
+  locationFallback: { fontFamily: fonts.body.regular, fontSize: 12, color: colors.inkFaint2, lineHeight: 16 },
   error: { color: '#b3261e', fontFamily: fonts.body.semiBold, fontSize: 13 },
   submit: { marginTop: 4 },
   switchText: { textAlign: 'center', fontFamily: fonts.body.medium, fontSize: 13, color: colors.inkSoft },

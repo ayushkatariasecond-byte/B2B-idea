@@ -17,6 +17,10 @@ export function signup(input: {
   isRestaurant?: boolean;
   cuisineSlug?: string;
   category?: string;
+  // Sent only when the user granted the location permission; omitted entirely otherwise,
+  // which puts the account on the city-matching fallback path server-side.
+  latitude?: number;
+  longitude?: number;
 }) {
   return api.post<AuthResponse>('/auth/signup', input);
 }

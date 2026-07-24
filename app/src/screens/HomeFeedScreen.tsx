@@ -9,7 +9,8 @@ import { StoryTray } from '../components/StoryTray';
 import { BottomNav } from '../components/BottomNav';
 import { Icon } from '../components/Icon';
 import { Chip } from '../components/Chip';
-import { colors, fonts } from '../theme/tokens';
+import { RestaurantMap } from '../components/RestaurantMap';
+import { colors, fonts, radius } from '../theme/tokens';
 import { Cuisine, Post } from '../api/types';
 import * as postsApi from '../api/posts';
 import * as businessesApi from '../api/businesses';
@@ -30,7 +31,37 @@ export function HomeFeedScreen() {
   const [feedCity, setFeedCity] = useState<string | null>(null);
   const [cuisines, setCuisines] = useState<Cuisine[]>([]);
   const [cuisineSlug, setCuisineSlug] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [nearby, setNearby] = useState<businessesApi.NearbyRestaurant[]>([]);
+  const [mapCenter, setMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [mapLoading, setMapLoading] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
   const viewedRef = useRef(new Set<string>());
+
+  // Pins are fetched lazily — only once the user actually opens the map — so the default
+  // list view costs nothing extra.
+  useEffect(() => {
+    if (viewMode !== 'map') return;
+    let cancelled = false;
+    setMapLoading(true);
+    setMapError(null);
+    businessesApi
+      .getNearbyRestaurants()
+      .then((res) => {
+        if (cancelled) return;
+        setNearby(res.restaurants);
+        setMapCenter(res.center);
+      })
+      .catch(() => {
+        if (!cancelled) setMapError('Could not load the map right now.');
+      })
+      .finally(() => {
+        if (!cancelled) setMapLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewMode]);
 
   useEffect(() => {
     businessesApi.getCuisines().then((res) => setCuisines(res.cuisines));
@@ -167,7 +198,30 @@ export function HomeFeedScreen() {
         </Pressable>
       </View>
 
-      {tab === 'forYou' && cuisines.length > 0 && (
+      {/* List/map toggle — For You only, since the map is inherently location-scoped and
+          the Following tab deliberately isn't. */}
+      {tab === 'forYou' && (
+        <View style={styles.viewToggleRow}>
+          <Pressable
+            onPress={() => setViewMode('list')}
+            style={[styles.viewToggle, viewMode === 'list' && styles.viewToggleActive]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: viewMode === 'list' }}
+          >
+            <Text style={[styles.viewToggleText, viewMode === 'list' && styles.viewToggleTextActive]}>List</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setViewMode('map')}
+            style={[styles.viewToggle, viewMode === 'map' && styles.viewToggleActive]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: viewMode === 'map' }}
+          >
+            <Text style={[styles.viewToggleText, viewMode === 'map' && styles.viewToggleTextActive]}>Map</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {tab === 'forYou' && viewMode === 'list' && cuisines.length > 0 && (
         <FlatList
           horizontal
           data={cuisines}
@@ -181,7 +235,7 @@ export function HomeFeedScreen() {
         />
       )}
 
-      <StoryTray />
+      {viewMode === 'list' && <StoryTray />}
     </View>
   );
 
@@ -191,6 +245,36 @@ export function HomeFeedScreen() {
 
   const emptyMessage =
     error ?? (tab === 'forYou' && feedCity ? `No restaurants in ${feedCity} yet.` : "Nothing here yet — follow a few businesses to fill this feed.");
+
+  if (tab === 'forYou' && viewMode === 'map') {
+    return (
+      <View style={styles.container}>
+        {header}
+        {mapLoading ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={colors.gold} />
+          </View>
+        ) : mapError ? (
+          <View style={styles.center}>
+            <Text style={styles.emptyText}>{mapError}</Text>
+          </View>
+        ) : nearby.length === 0 ? (
+          <View style={styles.center}>
+            <Text style={styles.emptyText}>
+              {feedCity ? `No mapped restaurants near ${feedCity} yet.` : 'No mapped restaurants nearby yet.'}
+            </Text>
+          </View>
+        ) : (
+          <RestaurantMap
+            restaurants={nearby}
+            center={mapCenter}
+            onSelect={(businessId: string) => navigation.navigate('BusinessProfile', { businessId })}
+          />
+        )}
+        <BottomNav active="home" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -267,6 +351,20 @@ const styles = StyleSheet.create({
   },
   tabItem: { alignItems: 'center' },
   cuisineRow: { gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
+  viewToggleRow: {
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+    marginHorizontal: 16,
+    marginTop: 10,
+    backgroundColor: colors.surfaceMuted2,
+    borderRadius: radius.pill,
+    padding: 3,
+    gap: 2,
+  },
+  viewToggle: { paddingVertical: 6, paddingHorizontal: 18, borderRadius: radius.pill },
+  viewToggleActive: { backgroundColor: colors.white },
+  viewToggleText: { fontFamily: fonts.body.semiBold, fontSize: 13, color: colors.inkMuted },
+  viewToggleTextActive: { color: colors.ink, fontFamily: fonts.body.bold },
   tabLabel: { fontFamily: fonts.display.semiBold, fontSize: 15 },
   tabLabelActive: { color: colors.ink, fontFamily: fonts.display.bold },
   tabLabelInactive: { color: colors.inkFaint, fontFamily: fonts.display.semiBold },

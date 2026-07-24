@@ -20,6 +20,14 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Nibbler uses your location to show restaurants near you. You can skip this and enter your city instead."
+        }
+      ]
+    ]
   }
 }

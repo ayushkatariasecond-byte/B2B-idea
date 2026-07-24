@@ -8,9 +8,22 @@ import { Avatar } from './Avatar';
 import { Icon } from './Icon';
 import { PostMedia } from './PostMedia';
 import { resolveMediaUrl } from '../api/client';
+import * as businessesApi from '../api/businesses';
 import { colors, fonts, radius } from '../theme/tokens';
 import { Business, Post } from '../api/types';
 import { RootStackParamList } from '../navigation/types';
+
+/**
+ * Opens a restaurant's ordering link and logs the click for their stats.
+ *
+ * The log is deliberately fire-and-forget and its failure is swallowed: this is the moment
+ * a viewer is trying to go order food, and an analytics call that's slow, offline, or
+ * rate-limited must never delay or block that. Worst case we undercount a click.
+ */
+function openWebsite(businessId: string, url: string) {
+  void businessesApi.logLinkClick(businessId).catch(() => undefined);
+  void Linking.openURL(url);
+}
 
 interface BusinessProfileContentProps {
   business: Business;
@@ -130,7 +143,7 @@ export function BusinessProfileContent({ business, posts, headerAction, moreActi
                 <Text style={styles.aboutValue}>{business.bio || 'No description yet.'}</Text>
 
                 {business.isRestaurant && business.website ? (
-                  <Pressable onPress={() => Linking.openURL(business.website!)} accessibilityRole="link">
+                  <Pressable onPress={() => openWebsite(business.id, business.website!)} accessibilityRole="link">
                     <Text style={[styles.aboutValue, styles.websiteLink]}>{business.website}</Text>
                   </Pressable>
                 ) : null}

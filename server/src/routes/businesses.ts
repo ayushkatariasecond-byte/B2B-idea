@@ -7,6 +7,8 @@ import { serializeBusiness, serializePost } from '../utils/serialize';
 import { upload } from '../upload';
 import { persistUpload } from '../storage';
 import { notify } from '../utils/notifications';
+import { getExcludedBusinessIds } from '../utils/blocking';
+import { hasCoords, boundingBox, matchesLocation, distanceMiles, DEFAULT_RADIUS_MILES } from '../utils/geo';
 
 export const businessesRouter = Router();
 
@@ -69,6 +71,77 @@ businessesRouter.get('/suggested', requireAuth, async (req: AuthedRequest, res) 
   res.json({ businesses: suggestions });
 });
 
+/**
+ * Restaurants near the authenticated viewer, with coordinates, for the feed's map view.
+ *
+ * This is the one place coordinates are ever sent to a client, and only ever a
+ * RESTAURANT's — never a viewer's (a viewer's coordinates are their home address; see the
+ * note on serializeBusiness). Even so the values are rounded to 3 decimal places, roughly
+ * 100m: that's precise enough to put a pin on the right block, while avoiding publishing a
+ * an exact fix that a restaurant never explicitly agreed to broadcast.
+ *
+ * Uses the same two-stage narrowing and the same `matchesLocation` rule as the For You
+ * feed, so the map can never show a restaurant the feed itself would have filtered out.
+ */
+businessesRouter.get('/nearby', requireAuth, async (req: AuthedRequest, res) => {
+  const viewer = await prisma.business.findUnique({
+    where: { id: req.businessId! },
+    select: { city: true, latitude: true, longitude: true },
+  });
+  if (!viewer) return res.status(404).json({ error: 'Not found' });
+
+  const viewerCity = viewer.city ?? '';
+  const excluded = await getExcludedBusinessIds(req.businessId);
+
+  const locationWhere = hasCoords(viewer)
+    ? (() => {
+        const box = boundingBox(viewer, DEFAULT_RADIUS_MILES);
+        return {
+          OR: [
+            { latitude: { gte: box.minLat, lte: box.maxLat }, longitude: { gte: box.minLon, lte: box.maxLon } },
+            { city: viewerCity, latitude: null },
+          ],
+        };
+      })()
+    : { city: viewerCity };
+
+  const candidates = await prisma.business.findMany({
+    where: { isRestaurant: true, suspended: false, id: { notIn: excluded }, ...locationWhere },
+    include: { cuisine: true },
+    take: 200,
+  });
+
+  // A restaurant with no coordinates can't be placed on a map at all, so it's dropped here
+  // (it still appears in the list view — this is a map-only omission, not a feed change).
+  const pins = candidates
+    .filter((b) => hasCoords(b) && matchesLocation(viewer, b, DEFAULT_RADIUS_MILES))
+    .map((b) => ({
+      id: b.id,
+      name: b.name,
+      handle: b.handle,
+      avatarUrl: b.avatarUrl,
+      cuisine: b.cuisine ? { id: b.cuisine.id, name: b.cuisine.name, slug: b.cuisine.slug } : null,
+      latitude: Math.round(b.latitude! * 1000) / 1000,
+      longitude: Math.round(b.longitude! * 1000) / 1000,
+      distanceMiles: hasCoords(viewer) ? Math.round(distanceMiles(viewer, b as { latitude: number; longitude: number }) * 10) / 10 : null,
+    }))
+    .sort((a, b) => (a.distanceMiles ?? 0) - (b.distanceMiles ?? 0));
+
+  res.json({
+    restaurants: pins,
+    city: viewerCity,
+    radiusMiles: DEFAULT_RADIUS_MILES,
+    // Lets the client center the map and decide whether to prompt for location, without
+    // ever handing it the viewer's own precise coordinates.
+    viewerHasLocation: hasCoords(viewer),
+    center: hasCoords(viewer)
+      ? { latitude: Math.round(viewer.latitude! * 1000) / 1000, longitude: Math.round(viewer.longitude! * 1000) / 1000 }
+      : pins.length > 0
+        ? { latitude: pins[0].latitude, longitude: pins[0].longitude }
+        : null,
+  });
+});
+
 businessesRouter.get('/:id', optionalAuth, async (req: AuthedRequest, res) => {
   const result = await withStats(req.params.id, req.businessId);
   if (!result) return res.status(404).json({ error: 'Business not found' });
@@ -95,6 +168,10 @@ const updateSchema = z.object({
   category: z.string().min(2).max(60).optional(),
   bio: z.string().max(280).optional(),
   city: z.string().min(1).max(80).optional(),
+  // Sent when the user grants (or re-grants) the location permission from profile setup.
+  // Both must arrive together to be applied — see the pairing check in the handler.
+  latitude: z.number().finite().min(-90).max(90).optional(),
+  longitude: z.number().finite().min(-180).max(180).optional(),
   website: z.union([z.string().url().max(300), z.literal('')]).optional(),
   cuisineSlug: z.string().min(1).max(50).optional(),
   // Full-replace, matching the update-your-whole-menu-at-once pattern this route already
@@ -105,7 +182,12 @@ const updateSchema = z.object({
 businessesRouter.patch('/me', requireAuth, async (req: AuthedRequest, res) => {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' });
-  const { cuisineSlug, website, ...rest } = parsed.data;
+  const { cuisineSlug, website, latitude, longitude, ...rest } = parsed.data;
+
+  // Coordinates are written as a pair or not at all. Letting one through alone would
+  // leave a half-set location that reads as "has coordinates" to some checks and not
+  // others; requiring both keeps the account in exactly one of the two match modes.
+  const coordFields = hasCoords({ latitude, longitude }) ? { latitude, longitude } : {};
 
   let cuisineFields: { cuisineId: string; category: string } | undefined;
   if (cuisineSlug) {
@@ -120,6 +202,7 @@ businessesRouter.patch('/me', requireAuth, async (req: AuthedRequest, res) => {
       ...rest,
       ...(website !== undefined ? { website: website === '' ? null : website } : {}),
       ...cuisineFields,
+      ...coordFields,
     },
     include: { cuisine: true },
   });
@@ -201,9 +284,61 @@ businessesRouter.delete('/me', requireAuth, requireOwner, async (req: AuthedRequ
     prisma.redemption.deleteMany({ where: { userId: businessId } }),
     prisma.redemption.deleteMany({ where: { promoCode: { restaurantId: businessId } } }),
     prisma.promoCode.deleteMany({ where: { restaurantId: businessId } }),
+    // Both directions, same reasoning as the Redemption pair above: clicks ON this
+    // restaurant's link (restaurantId, an FK with onDelete: Restrict) would otherwise
+    // block the delete outright, and clicks this account MADE on other restaurants'
+    // links (viewerId) are its own activity data and go with the account.
+    prisma.linkClick.deleteMany({ where: { restaurantId: businessId } }),
+    prisma.linkClick.deleteMany({ where: { viewerId: businessId } }),
     prisma.business.delete({ where: { id: businessId } }),
   ]);
   res.json({ ok: true });
+});
+
+// Logs a tap on a restaurant's website/ordering link — the closest thing this app has to a
+// conversion signal. `optionalAuth` rather than `requireAuth` on purpose: restaurant
+// profiles are publicly viewable and their links publicly tappable, so requiring a login
+// here would silently undercount exactly the traffic a restaurant cares most about.
+// Rate limiting comes from the global apiLimiter; there's no per-viewer dedupe because a
+// repeat tap is a real repeat intent to order, not a duplicate to be collapsed.
+businessesRouter.post('/:id/link-click', optionalAuth, async (req: AuthedRequest, res) => {
+  const restaurant = await prisma.business.findUnique({ where: { id: req.params.id } });
+  if (!restaurant) return res.status(404).json({ error: 'Business not found' });
+
+  await prisma.linkClick.create({
+    data: { restaurantId: restaurant.id, viewerId: req.businessId ?? null },
+  });
+  res.status(201).json({ ok: true });
+});
+
+// Click stats for the authenticated restaurant's OWN link only. There is deliberately no
+// `:id` variant of this route — click volume is competitive business intelligence, so the
+// only way to read it is as the account that owns it (scoped by req.businessId, which
+// comes from the verified token and can't be spoofed via a path param).
+businessesRouter.get('/me/link-clicks', requireAuth, async (req: AuthedRequest, res) => {
+  const businessId = req.businessId!;
+  const now = Date.now();
+  const d30 = new Date(now - 30 * 24 * 60 * 60 * 1000);
+  const d60 = new Date(now - 60 * 24 * 60 * 60 * 1000);
+
+  const [total, last30, prev30, recent] = await Promise.all([
+    prisma.linkClick.count({ where: { restaurantId: businessId } }),
+    prisma.linkClick.count({ where: { restaurantId: businessId, clickedAt: { gte: d30 } } }),
+    prisma.linkClick.count({ where: { restaurantId: businessId, clickedAt: { gte: d60, lt: d30 } } }),
+    prisma.linkClick.findMany({
+      where: { restaurantId: businessId },
+      orderBy: { clickedAt: 'desc' },
+      take: 50,
+      select: { clickedAt: true },
+    }),
+  ]);
+
+  res.json({
+    totalClicks: total,
+    clicks30d: last30,
+    clicksPrev30d: prev30,
+    recentClicks: recent.map((c) => c.clickedAt),
+  });
 });
 
 businessesRouter.post('/:id/follow', requireAuth, async (req: AuthedRequest, res) => {

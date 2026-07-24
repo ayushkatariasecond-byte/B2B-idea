@@ -12,6 +12,7 @@ import { persistUpload } from '../storage';
 import { recencyBoost, velocityBoost, explorationJitter, currentHourBucket, diversify } from '../utils/ranking';
 import { containsBlockedContent } from '../utils/moderation';
 import { logger } from '../utils/logger';
+import { boundingBox, hasCoords, matchesLocation, DEFAULT_RADIUS_MILES } from '../utils/geo';
 
 export const postsRouter = Router();
 
@@ -65,14 +66,30 @@ postsRouter.get('/feed', optionalAuth, async (req: AuthedRequest, res) => {
     return res.json({ posts: posts.map(serializePost), page, hasMore: posts.length === PAGE_SIZE });
   }
 
-  // Nibbler: city-lock is a hard, non-negotiable pre-filter — it has to be a WHERE
-  // clause the candidate pool is fetched with, never a post-hoc JS filter or a ranking
-  // signal, so a post from another city is never even in `all` for the scoring below to
-  // see. Requires a known viewer (their city), so — same as the Following tab just above
-  // — an anonymous request is rejected rather than served an undefined-city feed.
+  // Nibbler: the location lock is a hard, non-negotiable pre-filter — a post from outside
+  // the viewer's area must never reach the scoring below. Requires a known viewer (their
+  // location), so — same as the Following tab just above — an anonymous request is
+  // rejected rather than served an unscoped feed.
+  //
+  // This used to be a single exact city-string equality in the WHERE clause. It is now a
+  // real distance radius (see utils/geo.ts) whenever the viewer AND the restaurant both
+  // have coordinates, falling back to that same city-string equality when either side
+  // doesn't — so users who declined the location permission, pre-existing accounts, and
+  // the seeded demo data all keep working exactly as before.
+  //
+  // The hard-filter guarantee is preserved, just in two stages instead of one: SQL narrows
+  // by an indexable lat/long bounding box (or by city, for the fallback group), and the
+  // exact circle test then runs over that candidate set. The box is strictly LARGER than
+  // the circle it contains, so stage two only ever removes rows stage one let through —
+  // it can never add one back. Nothing out of range can survive both stages, and nothing
+  // in range is dropped by the prefilter.
   if (!req.businessId) return res.status(401).json({ error: 'Login required to see your city’s feed' });
-  const viewer = await prisma.business.findUnique({ where: { id: req.businessId }, select: { city: true } });
+  const viewer = await prisma.business.findUnique({
+    where: { id: req.businessId },
+    select: { city: true, latitude: true, longitude: true },
+  });
   const viewerCity = viewer?.city ?? '';
+  const viewerHasCoords = hasCoords(viewer);
 
   const cuisineSlug = typeof req.query.cuisine === 'string' ? req.query.cuisine.slice(0, 50) : undefined;
   let cuisineId: string | undefined;
@@ -82,36 +99,70 @@ postsRouter.get('/feed', optionalAuth, async (req: AuthedRequest, res) => {
     cuisineId = cuisine.id;
   }
 
+  // Stage one. A viewer with coordinates gets the bounding box OR'd with an exact city
+  // match, because the restaurants they should see are of two kinds: geolocated ones
+  // (matched by distance) and city-only ones that never captured coordinates (matched by
+  // city, as before). A viewer without coordinates can only ever match on city.
+  const locationWhere = viewerHasCoords
+    ? (() => {
+        const box = boundingBox(viewer as { latitude: number; longitude: number }, DEFAULT_RADIUS_MILES);
+        return {
+          OR: [
+            {
+              latitude: { gte: box.minLat, lte: box.maxLat },
+              longitude: { gte: box.minLon, lte: box.maxLon },
+            },
+            { city: viewerCity, latitude: null },
+          ],
+        };
+      })()
+    : { city: viewerCity };
+
   // For You: a bounded candidate pool (still recency-ordered so we don't do a full
   // table scan), then re-ranked by a real `finalScore` — see utils/ranking.ts for the
   // rationale behind each term. Personalization (follow/top-tag boosts) only applies
   // when the viewer is authenticated; anonymous viewers get the same ranking minus
   // those two terms, same as how the Following tab already gates on req.businessId.
-  const all = await prisma.post.findMany({
+  const candidates = await prisma.post.findMany({
     where: {
       ...visibilityWhere(),
       businessId: { notIn: excluded },
-      business: { isRestaurant: true, city: viewerCity, ...(cuisineId ? { cuisineId } : {}) },
+      business: { isRestaurant: true, ...locationWhere, ...(cuisineId ? { cuisineId } : {}) },
     },
     orderBy: { createdAt: 'desc' },
     take: 300,
     include: postInclude(req.businessId),
   });
 
-  // Structured logging around the city-lock specifically — per the hardening pass, this
-  // is the core untested-in-production logic (everything else here is either read-only
-  // browsing or protected by auth). One extra lightweight COUNT alongside the real query,
-  // so each log line shows not just "how many posts this viewer got" but the filter's
-  // actual impact: how many eligible restaurant posts exist platform-wide vs. how many
-  // were in this viewer's own city.
+  // Stage two: exact circle test, discarding the bounding box's corner overshoot. A no-op
+  // for the city-fallback group (matchesLocation returns their city comparison unchanged).
+  const all = candidates.filter((post) =>
+    matchesLocation(
+      { city: viewerCity, latitude: viewer?.latitude, longitude: viewer?.longitude },
+      post.business,
+      DEFAULT_RADIUS_MILES
+    )
+  );
+
+  // Structured logging around the location lock specifically — per the hardening pass,
+  // this is the core untested-in-production logic (everything else here is either
+  // read-only browsing or protected by auth). One extra lightweight COUNT alongside the
+  // real query, so each log line shows not just "how many posts this viewer got" but the
+  // filter's actual impact: how many eligible restaurant posts exist platform-wide vs.
+  // how many were actually near this viewer. `boxRejectedCount` isolates how much of the
+  // narrowing came from the exact distance test rather than the SQL prefilter.
   const totalEligiblePlatformWide = await prisma.post.count({
     where: { ...visibilityWhere(), businessId: { notIn: excluded }, business: { isRestaurant: true } },
   });
   logger.info('feed.city_lock', {
     viewerId: req.businessId,
     viewerCity,
+    viewerHasCoords,
+    matchMode: viewerHasCoords ? 'radius' : 'city',
+    radiusMiles: viewerHasCoords ? DEFAULT_RADIUS_MILES : null,
     cuisineFilter: cuisineSlug ?? null,
     matchedCount: all.length,
+    boxRejectedCount: candidates.length - all.length,
     mismatchCount: totalEligiblePlatformWide - all.length,
     totalEligiblePlatformWide,
   });
@@ -414,24 +465,79 @@ postsRouter.post('/:id/share', optionalAuth, async (req: AuthedRequest, res) => 
   res.json({ shareCount: updated.shareCount });
 });
 
-const commentSchema = z.object({ text: z.string().min(1).max(500) });
+const commentSchema = z.object({
+  text: z.string().min(1).max(500),
+  // Opt-in flag marking this as a question directed at the restaurant rather than a public
+  // remark. Defaults false so every existing client keeps posting plain comments.
+  isReply: z.boolean().optional().default(false),
+});
 
-postsRouter.get('/:id/comments', async (req, res) => {
+function serializeComment(c: {
+  id: string;
+  text: string;
+  createdAt: Date;
+  isReply: boolean;
+  answered: boolean;
+  business: { id: string; name: string; handle: string; avatarUrl: string | null };
+}) {
+  return {
+    id: c.id,
+    text: c.text,
+    createdAt: c.createdAt,
+    isReply: c.isReply,
+    answered: c.answered,
+    business: { id: c.business.id, name: c.business.name, handle: c.business.handle, avatarUrl: c.business.avatarUrl },
+  };
+}
+
+postsRouter.get('/:id/comments', optionalAuth, async (req: AuthedRequest, res) => {
   const post = await prisma.post.findUnique({ where: { id: req.params.id } });
   if (!post) return res.status(404).json({ error: 'Post not found' });
+
   const comments = await prisma.comment.findMany({
     where: { postId: req.params.id, hidden: false },
     orderBy: { createdAt: 'asc' },
     include: { business: true },
   });
+
+  // The post's owner sees unanswered questions pulled to the top — that's the whole point
+  // of the reply lane, so they don't have to scan a long thread to find what needs a
+  // response. Everyone else sees the thread in plain chronological order, so replies read
+  // as ordinary comments and the ordering isn't different for different viewers.
+  const isOwner = Boolean(req.businessId) && post.businessId === req.businessId;
+  const ordered = isOwner
+    ? [...comments].sort((a, b) => {
+        const aOpen = a.isReply && !a.answered ? 0 : 1;
+        const bOpen = b.isReply && !b.answered ? 0 : 1;
+        if (aOpen !== bOpen) return aOpen - bOpen;
+        return a.createdAt.getTime() - b.createdAt.getTime();
+      })
+    : comments;
+
   res.json({
-    comments: comments.map((c) => ({
-      id: c.id,
-      text: c.text,
-      createdAt: c.createdAt,
-      business: { id: c.business.id, name: c.business.name, handle: c.business.handle, avatarUrl: c.business.avatarUrl },
-    })),
+    comments: ordered.map(serializeComment),
+    // Drives the small "N questions" indicator on the owner's own post.
+    openReplyCount: comments.filter((c) => c.isReply && !c.answered).length,
   });
+});
+
+// Marks a question as handled. Restricted to the post's owner: it's their inbox indicator,
+// and letting the asker (or anyone else) clear it would make the count meaningless.
+postsRouter.post('/:postId/comments/:commentId/answered', requireAuth, async (req: AuthedRequest, res) => {
+  const comment = await prisma.comment.findUnique({ where: { id: req.params.commentId } });
+  if (!comment || comment.postId !== req.params.postId) return res.status(404).json({ error: 'Comment not found' });
+
+  const post = await prisma.post.findUnique({ where: { id: comment.postId } });
+  if (!post || post.businessId !== req.businessId) {
+    return res.status(403).json({ error: 'Only the post owner can do this' });
+  }
+
+  const updated = await prisma.comment.update({
+    where: { id: comment.id },
+    data: { answered: true },
+    include: { business: true },
+  });
+  res.json({ comment: serializeComment(updated) });
 });
 
 postsRouter.post('/:id/comments', requireAuth, async (req: AuthedRequest, res) => {
@@ -444,18 +550,11 @@ postsRouter.post('/:id/comments', requireAuth, async (req: AuthedRequest, res) =
   if (!post) return res.status(404).json({ error: 'Post not found' });
 
   const comment = await prisma.comment.create({
-    data: { postId: req.params.id, businessId: req.businessId!, text: parsed.data.text },
+    data: { postId: req.params.id, businessId: req.businessId!, text: parsed.data.text, isReply: parsed.data.isReply },
     include: { business: true },
   });
   void notify({ recipientId: post.businessId, actorId: req.businessId!, type: 'comment', postId: post.id });
-  res.status(201).json({
-    comment: {
-      id: comment.id,
-      text: comment.text,
-      createdAt: comment.createdAt,
-      business: { id: comment.business.id, name: comment.business.name, handle: comment.business.handle, avatarUrl: comment.business.avatarUrl },
-    },
-  });
+  res.status(201).json({ comment: serializeComment(comment) });
 });
 
 postsRouter.delete('/:postId/comments/:commentId', requireAuth, async (req: AuthedRequest, res) => {

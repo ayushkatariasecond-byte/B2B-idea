@@ -27,6 +27,9 @@ export interface Business {
   isFollowedByMe?: boolean;
   isMe?: boolean;
   city: string;
+  /** Whether this account has real coordinates stored. The coordinates themselves are
+   *  never serialized onto a profile — a viewer's would be their home location. */
+  hasLocation?: boolean;
   isRestaurant: boolean;
   website: string | null;
   cuisine: Cuisine | null;
@@ -60,6 +63,10 @@ export interface Comment {
   id: string;
   text: string;
   createdAt: string;
+  /** A question aimed at the restaurant rather than a public remark to the room. */
+  isReply: boolean;
+  /** Set by the post's owner once they've responded, clearing it from their open count. */
+  answered: boolean;
   business: Pick<Business, 'id' | 'name' | 'handle' | 'avatarUrl'>;
 }
 
@@ -82,6 +89,9 @@ export interface ThreadMessage {
 export interface AnalyticsResponse {
   views30d: number;
   viewsDeltaPct: number;
+  /** Taps on this restaurant's website/ordering link — the closest thing to a conversion. */
+  linkClicks30d: number;
+  linkClicksDeltaPct: number;
   engagementPct: number;
   engagementDeltaPts: number;
   creativityScore: number;

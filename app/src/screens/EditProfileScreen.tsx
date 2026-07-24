@@ -14,6 +14,7 @@ import * as businessesApi from '../api/businesses';
 import { ApiError } from '../api/client';
 import { alert } from '../utils/alert';
 import { Cuisine, MenuItem } from '../api/types';
+import { useLocationPermission, Coords } from '../hooks/useLocationPermission';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
 
@@ -30,8 +31,15 @@ export function EditProfileScreen({ navigation }: Props) {
   const [avatarUrl, setAvatarUrl] = useState(business?.avatarUrl ?? null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [coords, setCoords] = useState<Coords | null>(null);
+  const { status: locationStatus, request: requestLocation } = useLocationPermission();
 
   const isRestaurant = business?.isRestaurant ?? false;
+
+  const onUseLocation = async () => {
+    const result = await requestLocation();
+    if (result) setCoords(result);
+  };
 
   useEffect(() => {
     if (isRestaurant) businessesApi.getCuisines().then((res) => setCuisines(res.cuisines));
@@ -83,6 +91,9 @@ export function EditProfileScreen({ navigation }: Props) {
         name: name.trim(),
         bio: bio.trim(),
         city: city.trim(),
+        // Only sent if the user granted permission during this edit session; otherwise
+        // any previously-stored coordinates are left untouched.
+        ...(coords ? { latitude: coords.latitude, longitude: coords.longitude } : {}),
         ...(isRestaurant
           ? { website: website.trim(), cuisineSlug: cuisineSlug ?? undefined, menuItems: cleanMenuItems }
           : { category: category.trim() }),
@@ -113,6 +124,35 @@ export function EditProfileScreen({ navigation }: Props) {
 
         <TextField label={isRestaurant ? 'Restaurant name' : 'Name'} value={name} onChangeText={setName} autoCapitalize="words" />
         <TextField label="City" value={city} onChangeText={setCity} autoCapitalize="words" />
+
+        {/* Location stays optional here too — city above remains the required fallback. */}
+        <View style={styles.locationBox}>
+          {coords ? (
+            <Text style={styles.locationOn}>✓ Location updated — save to apply.</Text>
+          ) : (
+            <>
+              <Text style={styles.locationLabel}>
+                {business.hasLocation
+                  ? 'Location is set. Re-capture it if you’ve moved.'
+                  : isRestaurant
+                    ? 'Add your location so nearby diners can find you.'
+                    : 'Use your location to find restaurants near you.'}
+              </Text>
+              <Text
+                style={[styles.locationAction, locationStatus === 'requesting' && styles.locationActionDisabled]}
+                onPress={locationStatus === 'requesting' ? undefined : onUseLocation}
+                accessibilityRole="button"
+              >
+                {locationStatus === 'requesting' ? 'Getting location…' : 'Use my location'}
+              </Text>
+              {(locationStatus === 'denied' || locationStatus === 'unavailable') && (
+                <Text style={styles.locationFallback}>
+                  No problem — your city is used instead.
+                </Text>
+              )}
+            </>
+          )}
+        </View>
 
         {isRestaurant ? (
           <>
@@ -199,6 +239,12 @@ const styles = StyleSheet.create({
   avatarHint: { color: colors.gold, fontFamily: fonts.body.bold, fontSize: 13 },
   bioInput: { height: 90, paddingTop: 12, textAlignVertical: 'top' },
   field: { gap: 8 },
+  locationBox: { backgroundColor: colors.paper2, borderRadius: 12, padding: 14, gap: 6 },
+  locationLabel: { fontFamily: fonts.body.regular, fontSize: 13, color: colors.inkSoft, lineHeight: 18 },
+  locationAction: { fontFamily: fonts.body.bold, fontSize: 14, color: colors.gold },
+  locationActionDisabled: { color: colors.inkFaint2 },
+  locationOn: { fontFamily: fonts.body.semiBold, fontSize: 13, color: colors.green, lineHeight: 18 },
+  locationFallback: { fontFamily: fonts.body.regular, fontSize: 12, color: colors.inkFaint2, lineHeight: 16 },
   fieldLabel: {
     fontSize: 12,
     fontWeight: '700',

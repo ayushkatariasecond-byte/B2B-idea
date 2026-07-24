@@ -12,7 +12,10 @@ import { makeResetToken, makeVerifyToken } from '../authTokens';
 // the default here is a restaurant in a fixed shared test city. Tests that specifically
 // care about city-locking, cuisine filtering, or plain (non-posting) viewer accounts pass
 // explicit overrides.
-async function signup(handle: string, overrides: Partial<{ city: string; isRestaurant: boolean; cuisineSlug: string }> = {}) {
+async function signup(
+  handle: string,
+  overrides: Partial<{ city: string; isRestaurant: boolean; cuisineSlug: string; latitude: number; longitude: number }> = {}
+) {
   const res = await request(app)
     .post('/auth/signup')
     .send({
@@ -1542,6 +1545,498 @@ describe('Verve API', () => {
       .attach('media', path.join(__dirname, 'fixtures', 'sample.png'));
     expect(coverRes.status).toBe(200);
     expect(coverRes.body.business.coverUrl).toMatch(/^\/uploads\/.+\.png$/);
+  });
+
+  // --- Reply-to-post (questions directed at the restaurant) ---
+
+  it('creates a reply flagged distinctly from a plain comment', async () => {
+    const restaurant = await signup('replyrestaurant');
+    const post = await createPost(restaurant.token);
+    const asker = await signup('replyasker', { isRestaurant: false });
+
+    const reply = await request(app)
+      .post(`/posts/${post.body.post.id}/comments`)
+      .set('Authorization', `Bearer ${asker.token}`)
+      .send({ text: 'Are you open on Mondays?', isReply: true });
+
+    expect(reply.status).toBe(201);
+    expect(reply.body.comment.isReply).toBe(true);
+    expect(reply.body.comment.answered).toBe(false);
+  });
+
+  it('defaults to a plain comment when isReply is omitted, so existing clients are unaffected', async () => {
+    const restaurant = await signup('replydefault');
+    const post = await createPost(restaurant.token);
+    const commenter = await signup('replydefaultcommenter', { isRestaurant: false });
+
+    const res = await request(app)
+      .post(`/posts/${post.body.post.id}/comments`)
+      .set('Authorization', `Bearer ${commenter.token}`)
+      .send({ text: 'Looks great' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.comment.isReply).toBe(false);
+  });
+
+  it('reports the open question count to the post owner', async () => {
+    const restaurant = await signup('replycount');
+    const post = await createPost(restaurant.token);
+    const asker = await signup('replycountasker', { isRestaurant: false });
+
+    await request(app)
+      .post(`/posts/${post.body.post.id}/comments`)
+      .set('Authorization', `Bearer ${asker.token}`)
+      .send({ text: 'Do you have vegan options?', isReply: true });
+    await request(app)
+      .post(`/posts/${post.body.post.id}/comments`)
+      .set('Authorization', `Bearer ${asker.token}`)
+      .send({ text: 'Just a normal comment', isReply: false });
+
+    const res = await request(app)
+      .get(`/posts/${post.body.post.id}/comments`)
+      .set('Authorization', `Bearer ${restaurant.token}`);
+
+    expect(res.body.openReplyCount).toBe(1);
+  });
+
+  it('sorts unanswered questions first for the post owner only', async () => {
+    const restaurant = await signup('replysort');
+    const post = await createPost(restaurant.token);
+    const asker = await signup('replysortasker', { isRestaurant: false });
+
+    // Plain comment posted FIRST, question SECOND — so chronological order and
+    // questions-first order are genuinely different.
+    const plain = await request(app)
+      .post(`/posts/${post.body.post.id}/comments`)
+      .set('Authorization', `Bearer ${asker.token}`)
+      .send({ text: 'Nice photo' });
+    const question = await request(app)
+      .post(`/posts/${post.body.post.id}/comments`)
+      .set('Authorization', `Bearer ${asker.token}`)
+      .send({ text: 'Is this gluten free?', isReply: true });
+
+    const ownerView = await request(app)
+      .get(`/posts/${post.body.post.id}/comments`)
+      .set('Authorization', `Bearer ${restaurant.token}`);
+    expect(ownerView.body.comments[0].id).toBe(question.body.comment.id);
+
+    // Everyone else keeps plain chronological order.
+    const askerView = await request(app)
+      .get(`/posts/${post.body.post.id}/comments`)
+      .set('Authorization', `Bearer ${asker.token}`);
+    expect(askerView.body.comments[0].id).toBe(plain.body.comment.id);
+  });
+
+  it('lets the post owner mark a question answered, clearing it from the open count', async () => {
+    const restaurant = await signup('replyanswer');
+    const post = await createPost(restaurant.token);
+    const asker = await signup('replyanswerasker', { isRestaurant: false });
+    const question = await request(app)
+      .post(`/posts/${post.body.post.id}/comments`)
+      .set('Authorization', `Bearer ${asker.token}`)
+      .send({ text: 'Do you deliver?', isReply: true });
+
+    const res = await request(app)
+      .post(`/posts/${post.body.post.id}/comments/${question.body.comment.id}/answered`)
+      .set('Authorization', `Bearer ${restaurant.token}`)
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.comment.answered).toBe(true);
+
+    const after = await request(app)
+      .get(`/posts/${post.body.post.id}/comments`)
+      .set('Authorization', `Bearer ${restaurant.token}`);
+    expect(after.body.openReplyCount).toBe(0);
+  });
+
+  it('does not let anyone but the post owner mark a question answered', async () => {
+    // Including the person who asked it — otherwise the owner's indicator could be
+    // cleared out from under them and would stop meaning anything.
+    const restaurant = await signup('replyauthz');
+    const post = await createPost(restaurant.token);
+    const asker = await signup('replyauthzasker', { isRestaurant: false });
+    const stranger = await signup('replyauthzstranger', { isRestaurant: false });
+    const question = await request(app)
+      .post(`/posts/${post.body.post.id}/comments`)
+      .set('Authorization', `Bearer ${asker.token}`)
+      .send({ text: 'Parking?', isReply: true });
+
+    const byAsker = await request(app)
+      .post(`/posts/${post.body.post.id}/comments/${question.body.comment.id}/answered`)
+      .set('Authorization', `Bearer ${asker.token}`)
+      .send({});
+    expect(byAsker.status).toBe(403);
+
+    const byStranger = await request(app)
+      .post(`/posts/${post.body.post.id}/comments/${question.body.comment.id}/answered`)
+      .set('Authorization', `Bearer ${stranger.token}`)
+      .send({});
+    expect(byStranger.status).toBe(403);
+
+    const anon = await request(app)
+      .post(`/posts/${post.body.post.id}/comments/${question.body.comment.id}/answered`)
+      .send({});
+    expect(anon.status).toBe(401);
+  });
+
+  it('404s marking answered when the comment does not belong to that post', async () => {
+    const restaurant = await signup('replywrongpost');
+    const postA = await createPost(restaurant.token, { caption: 'Post A' });
+    const postB = await createPost(restaurant.token, { caption: 'Post B' });
+    const asker = await signup('replywrongpostasker', { isRestaurant: false });
+    const question = await request(app)
+      .post(`/posts/${postA.body.post.id}/comments`)
+      .set('Authorization', `Bearer ${asker.token}`)
+      .send({ text: 'Question on A', isReply: true });
+
+    const res = await request(app)
+      .post(`/posts/${postB.body.post.id}/comments/${question.body.comment.id}/answered`)
+      .set('Authorization', `Bearer ${restaurant.token}`)
+      .send({});
+    expect(res.status).toBe(404);
+  });
+
+  it('still applies the spam filter and moderation hiding to replies', async () => {
+    const restaurant = await signup('replymoderation');
+    const post = await createPost(restaurant.token);
+    const asker = await signup('replymoderationasker', { isRestaurant: false });
+
+    const spam = await request(app)
+      .post(`/posts/${post.body.post.id}/comments`)
+      .set('Authorization', `Bearer ${asker.token}`)
+      .send({ text: 'buy followers cheap here', isReply: true });
+    expect(spam.status).toBe(400);
+  });
+
+  // --- Ordering/website link click tracking ---
+
+  it('logs a link click from a logged-in viewer', async () => {
+    const restaurant = await signup('clicktarget');
+    const viewer = await signup('clickviewer', { isRestaurant: false });
+
+    const res = await request(app)
+      .post(`/businesses/${restaurant.business.id}/link-click`)
+      .set('Authorization', `Bearer ${viewer.token}`)
+      .send({});
+
+    expect(res.status).toBe(201);
+    const rows = await prisma.linkClick.findMany({ where: { restaurantId: restaurant.business.id } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].viewerId).toBe(viewer.business.id);
+  });
+
+  it('logs an anonymous link click with a null viewerId', async () => {
+    // Restaurant profiles are publicly viewable, so their links are publicly tappable —
+    // requiring auth here would undercount exactly the traffic restaurants care about.
+    const restaurant = await signup('clickanontarget');
+
+    const res = await request(app).post(`/businesses/${restaurant.business.id}/link-click`).send({});
+
+    expect(res.status).toBe(201);
+    const rows = await prisma.linkClick.findMany({ where: { restaurantId: restaurant.business.id } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].viewerId).toBeNull();
+  });
+
+  it('404s a link click against a business that does not exist', async () => {
+    const res = await request(app).post('/businesses/does-not-exist-id/link-click').send({});
+    expect(res.status).toBe(404);
+  });
+
+  it('counts repeat clicks separately rather than deduping them', async () => {
+    // A second tap is a real second intent to order, not a duplicate to collapse.
+    const restaurant = await signup('clickrepeat');
+    const viewer = await signup('clickrepeatviewer', { isRestaurant: false });
+
+    for (let i = 0; i < 3; i++) {
+      await request(app)
+        .post(`/businesses/${restaurant.business.id}/link-click`)
+        .set('Authorization', `Bearer ${viewer.token}`)
+        .send({});
+    }
+
+    const stats = await request(app)
+      .get('/businesses/me/link-clicks')
+      .set('Authorization', `Bearer ${restaurant.token}`);
+    expect(stats.body.totalClicks).toBe(3);
+    expect(stats.body.clicks30d).toBe(3);
+  });
+
+  it('returns an accurate click count on the stats endpoint', async () => {
+    const restaurant = await signup('clickstats');
+    const viewer = await signup('clickstatsviewer', { isRestaurant: false });
+
+    await request(app).post(`/businesses/${restaurant.business.id}/link-click`).send({});
+    await request(app)
+      .post(`/businesses/${restaurant.business.id}/link-click`)
+      .set('Authorization', `Bearer ${viewer.token}`)
+      .send({});
+
+    const res = await request(app)
+      .get('/businesses/me/link-clicks')
+      .set('Authorization', `Bearer ${restaurant.token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.totalClicks).toBe(2);
+    expect(res.body.recentClicks).toHaveLength(2);
+  });
+
+  it('never lets one restaurant see another restaurant\'s click data', async () => {
+    // Click volume is competitive business intelligence. The stats route is scoped by the
+    // token's own businessId and takes no :id param at all, so there is no path — spoofed
+    // or otherwise — for restaurant B to read restaurant A's numbers.
+    const restaurantA = await signup('clickisolationa');
+    const restaurantB = await signup('clickisolationb');
+
+    await request(app).post(`/businesses/${restaurantA.business.id}/link-click`).send({});
+    await request(app).post(`/businesses/${restaurantA.business.id}/link-click`).send({});
+
+    const bStats = await request(app)
+      .get('/businesses/me/link-clicks')
+      .set('Authorization', `Bearer ${restaurantB.token}`);
+    expect(bStats.status).toBe(200);
+    expect(bStats.body.totalClicks).toBe(0);
+
+    const aStats = await request(app)
+      .get('/businesses/me/link-clicks')
+      .set('Authorization', `Bearer ${restaurantA.token}`);
+    expect(aStats.body.totalClicks).toBe(2);
+  });
+
+  it('requires authentication to read click stats', async () => {
+    const res = await request(app).get('/businesses/me/link-clicks');
+    expect(res.status).toBe(401);
+  });
+
+  it('surfaces link clicks in the analytics dashboard, scoped to the owning restaurant', async () => {
+    const restaurantA = await signup('clickanalyticsa');
+    const restaurantB = await signup('clickanalyticsb');
+    await request(app).post(`/businesses/${restaurantA.business.id}/link-click`).send({});
+
+    const aRes = await request(app).get('/analytics/me').set('Authorization', `Bearer ${restaurantA.token}`);
+    expect(aRes.body.linkClicks30d).toBe(1);
+
+    const bRes = await request(app).get('/analytics/me').set('Authorization', `Bearer ${restaurantB.token}`);
+    expect(bRes.body.linkClicks30d).toBe(0);
+  });
+
+  it('deletes link clicks with the account rather than blocking the delete on a foreign key', async () => {
+    // restaurantId is an onDelete: Restrict FK — without explicit cleanup in the delete
+    // transaction, any restaurant that ever got a link tap could never delete its account.
+    const restaurant = await signup('clickdeletion');
+    const viewer = await signup('clickdeletionviewer', { isRestaurant: false });
+    await request(app).post(`/businesses/${restaurant.business.id}/link-click`).send({});
+    await request(app)
+      .post(`/businesses/${viewer.business.id}/link-click`)
+      .set('Authorization', `Bearer ${viewer.token}`)
+      .send({});
+
+    const res = await request(app).delete('/businesses/me').set('Authorization', `Bearer ${restaurant.token}`);
+    expect(res.status).toBe(200);
+    expect(await prisma.linkClick.count({ where: { restaurantId: restaurant.business.id } })).toBe(0);
+  });
+
+  // --- GPS / radius-based location matching ---
+  //
+  // Real coordinates so the distances are checkable: downtown Austin, Round Rock (~17mi,
+  // inside the 20mi default radius), San Marcos (~29mi, outside it), and Denver (~780mi).
+  const GEO = {
+    austin: { latitude: 30.2672, longitude: -97.7431 },
+    roundRock: { latitude: 30.5083, longitude: -97.6789 },
+    sanMarcos: { latitude: 29.8833, longitude: -97.9414 },
+    denver: { latitude: 39.7392, longitude: -104.9903 },
+  };
+
+  it('shows a geolocated restaurant inside the radius, even when its city label differs', async () => {
+    const restaurant = await signup('georadiusnear', { city: 'Round Rock', ...GEO.roundRock });
+    const post = await createPost(restaurant.token, { caption: 'Near geo restaurant' });
+    const viewer = await signup('georadiusviewer', { city: 'Austin', isRestaurant: false, ...GEO.austin });
+
+    const res = await request(app)
+      .get('/posts/feed?tab=forYou')
+      .set('Authorization', `Bearer ${viewer.token}`);
+
+    expect(res.status).toBe(200);
+    // The old exact city-string match ("Austin" !== "Round Rock") would have hidden this.
+    expect(res.body.posts.some((p: { id: string }) => p.id === post.body.post.id)).toBe(true);
+  });
+
+  it('hides a geolocated restaurant outside the radius', async () => {
+    const restaurant = await signup('georadiusfar', { city: 'San Marcos', ...GEO.sanMarcos });
+    const post = await createPost(restaurant.token, { caption: 'Far geo restaurant' });
+    const viewer = await signup('georadiusfarviewer', { city: 'Austin', isRestaurant: false, ...GEO.austin });
+
+    const res = await request(app)
+      .get('/posts/feed?tab=forYou')
+      .set('Authorization', `Bearer ${viewer.token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.posts.some((p: { id: string }) => p.id === post.body.post.id)).toBe(false);
+  });
+
+  it('hides a far-away restaurant whose city string happens to match the viewer\'s', async () => {
+    // Coordinates take precedence when both sides have them, so a same-named city in
+    // another state must not leak in through the fallback path.
+    const restaurant = await signup('geosamecityfar', { city: 'Springfield', ...GEO.denver });
+    const post = await createPost(restaurant.token, { caption: 'Same city name, wrong state' });
+    const viewer = await signup('geosamecityviewer', { city: 'Springfield', isRestaurant: false, ...GEO.austin });
+
+    const res = await request(app)
+      .get('/posts/feed?tab=forYou')
+      .set('Authorization', `Bearer ${viewer.token}`);
+
+    expect(res.body.posts.some((p: { id: string }) => p.id === post.body.post.id)).toBe(false);
+  });
+
+  it('falls back to city matching for a viewer who declined the location permission', async () => {
+    // The permission-denied path: no coordinates are sent at signup at all, and the
+    // account must still get a working feed rather than an empty one.
+    const restaurant = await signup('geodeniedrestaurant', { city: 'Fallbackville', ...GEO.austin });
+    const post = await createPost(restaurant.token, { caption: 'Fallback city restaurant' });
+    const viewer = await signup('geodeniedviewer', { city: 'Fallbackville', isRestaurant: false });
+
+    const res = await request(app)
+      .get('/posts/feed?tab=forYou')
+      .set('Authorization', `Bearer ${viewer.token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.posts.some((p: { id: string }) => p.id === post.body.post.id)).toBe(true);
+    expect(res.body.city).toBe('Fallbackville');
+  });
+
+  it('still shows a city-only restaurant to a geolocated viewer in the same city', async () => {
+    // Mixed population: a restaurant that never captured coordinates (pre-feature account
+    // or declined permission) must remain visible to viewers who DID grant location.
+    const restaurant = await signup('geomixedrestaurant', { city: 'Mixedtown' });
+    const post = await createPost(restaurant.token, { caption: 'City-only restaurant' });
+    const viewer = await signup('geomixedviewer', { city: 'Mixedtown', isRestaurant: false, ...GEO.austin });
+
+    const res = await request(app)
+      .get('/posts/feed?tab=forYou')
+      .set('Authorization', `Bearer ${viewer.token}`);
+
+    expect(res.body.posts.some((p: { id: string }) => p.id === post.body.post.id)).toBe(true);
+  });
+
+  it('does not expose raw coordinates on a profile, only a hasLocation flag', async () => {
+    // A viewer's coordinates are their home location — publishing them on a profile any
+    // stranger can fetch would be a privacy leak.
+    const viewer = await signup('geoprivacy', { city: 'Austin', isRestaurant: false, ...GEO.austin });
+    const res = await request(app).get(`/businesses/${viewer.business.id}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.business.hasLocation).toBe(true);
+    expect(res.body.business.latitude).toBeUndefined();
+    expect(res.body.business.longitude).toBeUndefined();
+  });
+
+  it('ignores a partial or out-of-range coordinate pair rather than storing half a location', async () => {
+    const viewer = await signup('geopartial', { city: 'Partialville', isRestaurant: false, latitude: 30.2672 });
+    const row = await prisma.business.findUnique({ where: { id: viewer.business.id } });
+    expect(row!.latitude).toBeNull();
+    expect(row!.longitude).toBeNull();
+  });
+
+  it('rejects an out-of-range coordinate at signup validation', async () => {
+    const res = await request(app).post('/auth/signup').send({
+      email: 'geobadrange@test.com',
+      password: 'password123',
+      name: 'Bad Range Inc',
+      handle: 'geobadrange',
+      city: 'Nowhere',
+      isRestaurant: false,
+      category: 'Testing',
+      latitude: 999,
+      longitude: -97.7431,
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('lets a restaurant attach coordinates later via profile update', async () => {
+    const restaurant = await signup('geolateattach', { city: 'Latetown' });
+    const before = await prisma.business.findUnique({ where: { id: restaurant.business.id } });
+    expect(before!.latitude).toBeNull();
+
+    const res = await request(app)
+      .patch('/businesses/me')
+      .set('Authorization', `Bearer ${restaurant.token}`)
+      .send({ latitude: GEO.austin.latitude, longitude: GEO.austin.longitude });
+
+    expect(res.status).toBe(200);
+    expect(res.body.business.hasLocation).toBe(true);
+    const after = await prisma.business.findUnique({ where: { id: restaurant.business.id } });
+    expect(after!.latitude).toBeCloseTo(GEO.austin.latitude, 4);
+    expect(after!.longitude).toBeCloseTo(GEO.austin.longitude, 4);
+  });
+
+  // --- Map view: nearby restaurants endpoint ---
+
+  it('returns nearby restaurants with coarsened coordinates and a distance', async () => {
+    const restaurant = await signup('mapnear', { city: 'Round Rock', ...GEO.roundRock });
+    const viewer = await signup('mapviewer', { city: 'Austin', isRestaurant: false, ...GEO.austin });
+
+    const res = await request(app).get('/businesses/nearby').set('Authorization', `Bearer ${viewer.token}`);
+
+    expect(res.status).toBe(200);
+    const pin = res.body.restaurants.find((r: { id: string }) => r.id === restaurant.business.id);
+    expect(pin).toBeDefined();
+    expect(pin.distanceMiles).toBeGreaterThan(0);
+    // Rounded to 3dp (~100m) so an exact fix isn't published for a restaurant.
+    expect(pin.latitude.toString().split('.')[1]?.length ?? 0).toBeLessThanOrEqual(3);
+    expect(pin.longitude.toString().split('.')[1]?.length ?? 0).toBeLessThanOrEqual(3);
+  });
+
+  it('excludes restaurants outside the radius from the map', async () => {
+    const far = await signup('mapfar', { city: 'San Marcos', ...GEO.sanMarcos });
+    const viewer = await signup('mapfarviewer', { city: 'Austin', isRestaurant: false, ...GEO.austin });
+
+    const res = await request(app).get('/businesses/nearby').set('Authorization', `Bearer ${viewer.token}`);
+    expect(res.body.restaurants.some((r: { id: string }) => r.id === far.business.id)).toBe(false);
+  });
+
+  it('omits restaurants that have no coordinates, since they cannot be placed on a map', async () => {
+    const cityOnly = await signup('mapcityonly', { city: 'Maptown' });
+    const viewer = await signup('mapcityonlyviewer', { city: 'Maptown', isRestaurant: false, ...GEO.austin });
+
+    const res = await request(app).get('/businesses/nearby').set('Authorization', `Bearer ${viewer.token}`);
+    expect(res.body.restaurants.some((r: { id: string }) => r.id === cityOnly.business.id)).toBe(false);
+  });
+
+  it('never returns plain viewer accounts as map pins', async () => {
+    const otherViewer = await signup('mapotherviewer', { city: 'Austin', isRestaurant: false, ...GEO.austin });
+    const viewer = await signup('mappinviewer', { city: 'Austin', isRestaurant: false, ...GEO.austin });
+
+    const res = await request(app).get('/businesses/nearby').set('Authorization', `Bearer ${viewer.token}`);
+    expect(res.body.restaurants.some((r: { id: string }) => r.id === otherViewer.business.id)).toBe(false);
+  });
+
+  it('excludes blocked businesses from the map, matching the feed', async () => {
+    const blocked = await signup('mapblocked', { city: 'Austin', ...GEO.austin });
+    const viewer = await signup('mapblockviewer', { city: 'Austin', isRestaurant: false, ...GEO.austin });
+    await request(app)
+      .post(`/businesses/${blocked.business.id}/block`)
+      .set('Authorization', `Bearer ${viewer.token}`)
+      .send({});
+
+    const res = await request(app).get('/businesses/nearby').set('Authorization', `Bearer ${viewer.token}`);
+    expect(res.body.restaurants.some((r: { id: string }) => r.id === blocked.business.id)).toBe(false);
+  });
+
+  it('requires authentication for the nearby endpoint', async () => {
+    const res = await request(app).get('/businesses/nearby');
+    expect(res.status).toBe(401);
+  });
+
+  it('reports whether the viewer has a location so the client can prompt for it', async () => {
+    const withLoc = await signup('maphasloc', { city: 'Austin', isRestaurant: false, ...GEO.austin });
+    const withoutLoc = await signup('mapnoloc', { city: 'Austin', isRestaurant: false });
+
+    const a = await request(app).get('/businesses/nearby').set('Authorization', `Bearer ${withLoc.token}`);
+    expect(a.body.viewerHasLocation).toBe(true);
+
+    const b = await request(app).get('/businesses/nearby').set('Authorization', `Bearer ${withoutLoc.token}`);
+    expect(b.body.viewerHasLocation).toBe(false);
   });
 
   it('shows an empty result (not another city\'s posts) when the cuisine filter matches nothing in the viewer\'s own city', async () => {

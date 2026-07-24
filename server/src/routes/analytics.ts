@@ -26,14 +26,18 @@ analyticsRouter.get('/me', requireAuth, async (req: AuthedRequest, res) => {
   });
   const myPostIds = myPosts.map((p) => p.id);
 
-  const [views30, viewsPrev30, likes30, likesPrev30, comments30, commentsPrev30] = await Promise.all([
-    prisma.postView.count({ where: { postId: { in: myPostIds }, createdAt: { gte: d30 } } }),
-    prisma.postView.count({ where: { postId: { in: myPostIds }, createdAt: { gte: d60, lt: d30 } } }),
-    prisma.like.count({ where: { postId: { in: myPostIds }, createdAt: { gte: d30 } } }),
-    prisma.like.count({ where: { postId: { in: myPostIds }, createdAt: { gte: d60, lt: d30 } } }),
-    prisma.comment.count({ where: { postId: { in: myPostIds }, createdAt: { gte: d30 } } }),
-    prisma.comment.count({ where: { postId: { in: myPostIds }, createdAt: { gte: d60, lt: d30 } } }),
-  ]);
+  const [views30, viewsPrev30, likes30, likesPrev30, comments30, commentsPrev30, linkClicks30, linkClicksPrev30] =
+    await Promise.all([
+      prisma.postView.count({ where: { postId: { in: myPostIds }, createdAt: { gte: d30 } } }),
+      prisma.postView.count({ where: { postId: { in: myPostIds }, createdAt: { gte: d60, lt: d30 } } }),
+      prisma.like.count({ where: { postId: { in: myPostIds }, createdAt: { gte: d30 } } }),
+      prisma.like.count({ where: { postId: { in: myPostIds }, createdAt: { gte: d60, lt: d30 } } }),
+      prisma.comment.count({ where: { postId: { in: myPostIds }, createdAt: { gte: d30 } } }),
+      prisma.comment.count({ where: { postId: { in: myPostIds }, createdAt: { gte: d60, lt: d30 } } }),
+      // Scoped by restaurantId = this business, so a restaurant only ever sees its own.
+      prisma.linkClick.count({ where: { restaurantId: businessId, clickedAt: { gte: d30 } } }),
+      prisma.linkClick.count({ where: { restaurantId: businessId, clickedAt: { gte: d60, lt: d30 } } }),
+    ]);
 
   const engagement30 = views30 > 0 ? ((likes30 + comments30) / views30) * 100 : 0;
   const engagementPrev30 = viewsPrev30 > 0 ? ((likesPrev30 + commentsPrev30) / viewsPrev30) * 100 : 0;
@@ -101,6 +105,8 @@ analyticsRouter.get('/me', requireAuth, async (req: AuthedRequest, res) => {
   res.json({
     views30d: views30,
     viewsDeltaPct: Math.round(pctDelta(views30, viewsPrev30) * 10) / 10,
+    linkClicks30d: linkClicks30,
+    linkClicksDeltaPct: Math.round(pctDelta(linkClicks30, linkClicksPrev30) * 10) / 10,
     engagementPct: Math.round(engagement30 * 10) / 10,
     engagementDeltaPts: Math.round((engagement30 - engagementPrev30) * 10) / 10,
     creativityScore,

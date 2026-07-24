@@ -28,7 +28,18 @@ model Business {
   // signup-validation layer for every account (restaurant or plain viewer) — it's what
   // scopes a viewer's feed. `@default("")` only exists so this stays a safe additive
   // migration; no real row should ever keep the empty default past signup.
+  //
+  // `city` is deliberately RETAINED alongside the real coordinates below rather than
+  // replaced by them, for two reasons: it's the human-readable label the UI shows
+  // ("No restaurants in Austin yet"), and it's the fallback matching key whenever either
+  // side of a match has no coordinates — someone who declines the GPS permission still
+  // gets a working feed instead of an empty one. See utils/geo.ts for the match rule.
   city                   String   @default("")
+  // Real device coordinates, captured via expo-location when the user grants permission.
+  // Nullable on purpose: permission-denied is a first-class supported state, not an error,
+  // and every pre-existing row (and every seeded demo account) legitimately has none.
+  latitude               Float?
+  longitude              Float?
   isRestaurant           Boolean  @default(false)
   website                String?
   cuisineId              String?
@@ -58,8 +69,13 @@ model Business {
   storyViews      StoryView[]
   promoCodes      PromoCode[]
   redemptions     Redemption[]
+  linkClicks      LinkClick[]     @relation("LinkClickRestaurant")
+  linkClicksMade  LinkClick[]     @relation("LinkClickViewer")
 
   @@index([isRestaurant, city])
+  // Supports the feed's bounding-box prefilter (see routes/posts.ts): restaurants are
+  // narrowed by isRestaurant + a lat/long range before any distance math runs.
+  @@index([isRestaurant, latitude, longitude])
 }
 
 // Discount-code redemption tracking. One restaurant can issue multiple codes; a code is
@@ -92,6 +108,26 @@ model Redemption {
   user        Business? @relation(fields: [userId], references: [id])
 
   @@index([promoCodeId])
+}
+
+// One tap of a restaurant's website / ordering link. This is the closest thing Nibbler has
+// to a conversion signal — it's the moment a viewer leaves to actually order — so it's
+// worth its own table rather than a counter column on Business: a raw count can't answer
+// "when did they click" or "is this trending", and an atomic increment would throw away
+// the timestamps a restaurant's stats view needs.
+//
+// `viewerId` is nullable by design, matching Redemption above: public restaurant profiles
+// are viewable (and their links tappable) without an account, and dropping those clicks
+// would undercount the exact traffic a restaurant most wants to see.
+model LinkClick {
+  id           String   @id @default(cuid())
+  restaurantId String
+  restaurant   Business @relation("LinkClickRestaurant", fields: [restaurantId], references: [id])
+  clickedAt    DateTime @default(now())
+  viewerId     String?
+  viewer       Business? @relation("LinkClickViewer", fields: [viewerId], references: [id])
+
+  @@index([restaurantId, clickedAt])
 }
 
 // Fixed cuisine taxonomy — a lookup table, not free text, so filtering/search stays
@@ -262,7 +298,26 @@ model Comment {
   hidden     Boolean  @default(false)
   createdAt  DateTime @default(now())
 
+  // A "reply" is a comment the author flagged as directed at the restaurant — a question
+  // about hours, allergens, whether something's still on the menu — as opposed to a public
+  // remark to the room. Deliberately a boolean on Comment rather than its own model: the
+  // row shape is identical (post, author, text, moderation flag, timestamp), so a separate
+  // table would duplicate the schema, the moderation/hide path, the delete cascades, and
+  // the serializer, purely to encode one bit. It also stays honest about what this is —
+  // a lightweight lane inside the existing comment thread, not a messaging system. If
+  // replies ever need their own lifecycle (threading, read receipts, DM-style delivery),
+  // that's the point to split them out, and this flag is what would be migrated from.
+  //
+  // NOTE: not a self-referencing parentId — this is a viewer→restaurant question about the
+  // post, not a comment-on-a-comment. Nesting is explicitly out of scope.
+  isReply    Boolean  @default(false)
+  // Set by the post's owner once they've dealt with a reply, so the "open questions"
+  // indicator can drop back to zero without deleting the conversation.
+  answered   Boolean  @default(false)
+
   @@index([postId])
+  // Backs the owner's "unanswered replies first" query without scanning every comment.
+  @@index([postId, isReply, answered])
 }
 
 model Follow {
