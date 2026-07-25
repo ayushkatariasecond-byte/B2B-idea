@@ -5,6 +5,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { ApiError } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { alert } from '../utils/alert';
 import { colors, fonts, radius } from '../theme/tokens';
@@ -50,8 +51,19 @@ export function OnboardingScreen({ navigation }: Props) {
     setGuestLoading(true);
     try {
       await loginAsGuest();
-    } catch {
-      alert('Could not continue', 'Something went wrong starting a guest session. Please try again.');
+    } catch (e) {
+      // Surface what actually failed, the way every other auth screen does
+      // (LoginScreen/SignupScreen both use this exact ApiError check).
+      //
+      // This previously swallowed the error entirely and always said "Something went wrong",
+      // which cost real debugging time during an outage: the backend's database credentials
+      // were invalid, so every auth path was returning a server error, but the guest button
+      // reported the same generic sentence it would have shown for a network drop, a 429, or
+      // a bad response. The message the server actually sent — and ApiError's "can't reach
+      // the server" case, which points at a completely different cause — never reached the
+      // screen. Guest is the first thing a new visitor taps, so it's the worst place to hide
+      // the reason.
+      alert('Could not continue', e instanceof ApiError ? e.message : 'Something went wrong starting a guest session. Please try again.');
       setGuestLoading(false);
     }
   };

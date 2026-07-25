@@ -20,7 +20,7 @@ import { storiesRouter } from './routes/stories';
 import { cuisinesRouter } from './routes/cuisines';
 import { promoCodesRouter } from './routes/promoCodes';
 import { UPLOAD_DIR } from './upload';
-import { prisma } from './db';
+import { prisma, isDatabaseUnavailableError } from './db';
 import { setupRealtime } from './realtime';
 import { initSentry, sentryEnabled, Sentry } from './observability';
 import { helmetMiddleware, corsMiddleware, authLimiter, apiLimiter } from './security';
@@ -100,6 +100,16 @@ if (sentryEnabled()) {
 // logged server-side (and to Sentry, via the handler registered just above) for debugging.
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);
+  // A database that can't be reached (or won't accept our credentials) is an outage, not a
+  // bug in the request — and it takes down every route at once. Saying so with a 503 keeps
+  // the generic 500 above meaning what it should ("this is unexpected, look at the code"),
+  // and gives the client something true to show instead of "Internal server error". See
+  // isDatabaseUnavailableError in db.ts for the incident that motivated this.
+  if (isDatabaseUnavailableError(err)) {
+    return res
+      .status(503)
+      .json({ error: 'The service is temporarily unavailable (database). Please try again in a moment.' });
+  }
   res.status(500).json({ error: 'Internal server error' });
 });
 

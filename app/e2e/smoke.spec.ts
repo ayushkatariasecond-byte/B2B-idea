@@ -153,6 +153,56 @@ test.describe('2. Login', () => {
     await expect(page.getByText(caption)).toBeVisible({ timeout: 40_000 });
     await expectNoPageErrors(errors);
   });
+
+  /**
+   * "Continue as guest" is the first thing a new visitor taps and, until this test, the only
+   * entry path with no coverage at all — which is how it came to be the face of a production
+   * outage nobody could diagnose from the UI.
+   */
+  test('a visitor can continue as guest and reaches the feed', async ({ page }) => {
+    const errors = watchForErrors(page);
+
+    await page.goto('/');
+    const guestCall = page.waitForResponse(
+      (r) => r.url().includes('/auth/guest') && r.request().method() === 'POST'
+    );
+    await page.getByText('Continue as guest', { exact: true }).click();
+    expect((await guestCall).status()).toBe(200);
+
+    await expectOnFeed(page);
+    expect(await page.evaluate(() => localStorage.getItem('verve.authToken'))).toBeTruthy();
+    await expectNoPageErrors(errors);
+  });
+
+  /**
+   * Regression for the swallowed-error bug.
+   *
+   * During the outage the backend was answering every auth request with a server error, but
+   * this screen caught the ApiError, threw its message away, and always said "Something went
+   * wrong starting a guest session" — the same sentence it shows for a dropped network, a
+   * rate-limit, or a 500. Three unrelated causes, one useless message, and no way to tell
+   * from the app which one you were looking at.
+   *
+   * Asserting on the SERVER's wording is the point: it can only appear if the real error is
+   * being propagated rather than replaced by the fallback.
+   */
+  test('the guest button surfaces the real reason when the server fails', async ({ page }) => {
+    const serverMessage = 'The service is temporarily unavailable (database). Please try again in a moment.';
+    await page.route('**/auth/guest', (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: serverMessage }),
+      })
+    );
+
+    await page.goto('/');
+    await page.getByText('Continue as guest', { exact: true }).click();
+
+    await expect(page.getByText(serverMessage)).toBeVisible({ timeout: 20_000 });
+    // ...and specifically NOT the old catch-all, which is what used to be shown instead.
+    await expect(page.getByText('Something went wrong starting a guest session')).toHaveCount(0);
+  });
 });
 
 test.describe('3. Posting', () => {

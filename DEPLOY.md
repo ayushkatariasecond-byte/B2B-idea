@@ -121,6 +121,42 @@ public launch on a project literally named "-prototype," rename it from the Supa
 - [ ] Invite a teammate → they receive the invite email
 - [ ] The city you launched in actually shows content in the For You feed (see seed-content note above)
 
+## Troubleshooting: every login path fails at once
+
+If guest, viewer, and restaurant sign-in all break *simultaneously*, the cause is almost never
+any one flow — it's something all three share. Check in this order:
+
+1. **`<api-url>/health`.** `{"ok":false,"db":"unreachable"}` means the database, not the app.
+   Auth routes now answer **503** ("temporarily unavailable (database)") rather than a bare 500
+   when this happens, so a 503 on `/auth/guest` is the same signal.
+2. **Railway runtime logs.** `Authentication failed against database server ... credentials for
+   'postgres' are not valid` is the fingerprint of the failure described below.
+3. **CORS.** A misconfigured `ALLOWED_ORIGIN` blocks the browser *silently* — no server-side log
+   at all, because the request is rejected before it matters. Confirm the API returns an
+   `Access-Control-Allow-Origin` header for your web origin:
+   `curl -sI -H "Origin: https://<your-vercel-domain>" <api-url>/health | grep -i access-control`
+   The value must match the origin **byte for byte** — a trailing slash, `http` instead of
+   `https`, or stray quotes each produce a total, silent block. (Unset is *not* the failure mode:
+   with no `ALLOWED_ORIGIN` the API reflects any origin, which is why local dev works.)
+
+### ⚠️ Changing `POSTGRES_PASSWORD` on a Railway Postgres does NOT change the password
+
+This has already caused one outage. Postgres reads `POSTGRES_PASSWORD` **only when it initialises
+an empty data directory**. The Railway Postgres service has a persistent volume, so on every
+later deploy the variable is ignored and the role keeps whatever password it was created with.
+
+Editing that variable therefore does something worse than nothing: `${{Postgres.DATABASE_URL}}`
+— which the API consumes — immediately starts advertising the *new* password, while the database
+still expects the *old* one. Every query then fails at the connection stage, so **every** auth
+path breaks at once while the service still reports a healthy deploy.
+
+There is no supported way to read the old password back out of Railway (the UI and API both mask
+it), so if it wasn't saved, it's gone. Recovery is to point `DATABASE_URL` at a freshly
+provisioned Postgres (migrations re-run automatically via `prestart`; then run `npm run
+seed:cuisines`, or restaurant signup will reject every account with "Unknown cuisine type").
+
+**Never edit `POSTGRES_PASSWORD` on a database that holds data you want.**
+
 ## Still required before a genuinely *public* launch (not deploy steps)
 
 - **Legal review.** `legal/terms-of-service.md`, `legal/privacy-policy.md`, `legal/dmca-policy.md`
