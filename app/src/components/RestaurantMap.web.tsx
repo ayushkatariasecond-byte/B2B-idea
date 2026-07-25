@@ -62,6 +62,12 @@ export function RestaurantMap({ restaurants, center, onSelect }: Props) {
     mapRef.current = map;
 
     return () => {
+      // stop() before remove(): Leaflet animates pan/zoom by default, and tearing the map
+      // down while a movement is still in flight leaves a queued animation frame that then
+      // reads the position cache off a container React has already detached — surfacing as
+      // an uncaught "Cannot read properties of undefined (reading '_leaflet_pos')". Toggling
+      // Map -> List quickly is enough to hit it.
+      map.stop();
       map.remove();
       mapRef.current = null;
       markersRef.current = [];
@@ -101,7 +107,10 @@ export function RestaurantMap({ restaurants, center, onSelect }: Props) {
     if (restaurants.length > 1) {
       map.fitBounds(
         L.latLngBounds(restaurants.map((r) => [r.latitude, r.longitude] as [number, number])),
-        { padding: [40, 40], maxZoom: 14 }
+        // animate:false — this fit happens as the map is first shown, so there is no
+        // movement for the user to follow anyway, and an animation running here is the most
+        // likely thing to still be in flight if they immediately switch back to the list.
+        { padding: [40, 40], maxZoom: 14, animate: false }
       );
     }
   }, [restaurants]);

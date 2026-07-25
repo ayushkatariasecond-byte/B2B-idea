@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // Playwright specs are Node programs, not React Native code — they need Node globals
+    // (Buffer, process) that the app's own tsconfig deliberately doesn't pull in.
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["**/*.ts", "../playwright.config.ts"],
+  "exclude": []
+}

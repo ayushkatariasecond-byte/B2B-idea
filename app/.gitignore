@@ -40,3 +40,7 @@ yarn-error.*
 /ios
 /android
 .claude/
+
+# Playwright
+test-results/
+playwright-report/
