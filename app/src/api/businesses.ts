@@ -1,5 +1,5 @@
-import { Platform } from 'react-native';
 import { api } from './client';
+import { appendFile } from './formFile';
 import { Business, Cuisine, MenuItem, Post } from './types';
 
 export function getBusiness(id: string) {
@@ -29,14 +29,12 @@ export function getCuisines() {
   return api.get<{ cuisines: Cuisine[] }>('/cuisines');
 }
 
-async function uploadImage(path: string, input: { uri: string; fileName: string; mimeType: string }) {
+async function uploadImage(
+  path: string,
+  input: { uri: string; fileName: string; mimeType: string; file?: File }
+) {
   const form = new FormData();
-  if (Platform.OS === 'web') {
-    const blob = await (await fetch(input.uri)).blob();
-    form.append('media', blob, input.fileName);
-  } else {
-    form.append('media', { uri: input.uri, name: input.fileName, type: input.mimeType } as unknown as Blob);
-  }
+  await appendFile(form, 'media', input);
   return api.postForm<{ business: Business }>(path, form);
 }
 
@@ -76,8 +74,8 @@ export function getLinkClickStats() {
   }>('/businesses/me/link-clicks');
 }
 
-export const updateAvatar = (input: { uri: string; fileName: string; mimeType: string }) => uploadImage('/businesses/me/avatar', input);
-export const updateCover = (input: { uri: string; fileName: string; mimeType: string }) => uploadImage('/businesses/me/cover', input);
+export const updateAvatar = (input: { uri: string; fileName: string; mimeType: string; file?: File }) => uploadImage('/businesses/me/avatar', input);
+export const updateCover = (input: { uri: string; fileName: string; mimeType: string; file?: File }) => uploadImage('/businesses/me/cover', input);
 
 export function toggleFollow(businessId: string) {
   return api.post<{ following: boolean; followerCount: number }>(`/businesses/${businessId}/follow`);

@@ -10,6 +10,7 @@ import { colors, fonts } from '../theme/tokens';
 import { RootStackParamList } from '../navigation/types';
 import { StoryGroup } from '../api/types';
 import * as storiesApi from '../api/stories';
+import { ApiError } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { alert } from '../utils/alert';
 
@@ -58,10 +59,11 @@ export function StoryTray() {
         uri: asset.uri,
         fileName: asset.fileName ?? (isVideo ? 'story.mp4' : 'story.jpg'),
         mimeType: asset.mimeType ?? (isVideo ? 'video/mp4' : 'image/jpeg'),
+        file: asset.file,
       });
       load();
-    } catch {
-      alert('Couldn’t post story', 'Something went wrong. Please try again.');
+    } catch (e) {
+      alert('Couldn’t post story', e instanceof ApiError ? e.message : 'Something went wrong. Please try again.');
     } finally {
       setPosting(false);
     }

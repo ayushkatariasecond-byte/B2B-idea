@@ -122,6 +122,9 @@ export function ComposeScreen({ navigation }: Props) {
         uri: media.uri,
         fileName: media.fileName ?? (isVideo ? 'upload.mp4' : 'upload.jpg'),
         mimeType: media.mimeType ?? (isVideo ? 'video/mp4' : 'image/jpeg'),
+        // Hand over the picker's own File on web so the upload never has to re-fetch
+        // the blob: URI. See api/formFile.ts.
+        file: media.file,
         caption,
         tag,
         thumbnail: thumbnail ?? undefined,

@@ -1,5 +1,5 @@
-import { Platform } from 'react-native';
 import { api } from './client';
+import { appendFile, FilePart } from './formFile';
 import { Comment, Post, PostStatus, TrendingTag } from './types';
 
 export function getFeed(tab: 'forYou' | 'following', page = 1, cuisineSlug?: string) {
@@ -51,27 +51,11 @@ export function getPost(id: string) {
   return api.get<{ post: Post }>(`/posts/${id}`);
 }
 
-interface FilePart {
-  uri: string;
-  fileName: string;
-  mimeType: string;
-}
-
-async function appendFile(form: FormData, field: string, file: FilePart) {
-  if (Platform.OS === 'web') {
-    // On web the picker gives a blob:/data: URI; fetch it to get a real Blob for FormData.
-    const blob = await (await fetch(file.uri)).blob();
-    form.append(field, blob, file.fileName);
-  } else {
-    // React Native's fetch/FormData polyfill accepts this { uri, name, type } shape natively.
-    form.append(field, { uri: file.uri, name: file.fileName, type: file.mimeType } as unknown as Blob);
-  }
-}
-
 export async function createPost(input: {
   uri: string;
   fileName: string;
   mimeType: string;
+  file?: File;
   caption: string;
   tag: string;
   thumbnail?: FilePart;

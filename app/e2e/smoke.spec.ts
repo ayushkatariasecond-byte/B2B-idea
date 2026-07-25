@@ -1,3 +1,4 @@
+import path from 'path';
 import { test, expect, Page } from '@playwright/test';
 import {
   API_URL,
@@ -239,6 +240,47 @@ test.describe('3. Posting', () => {
     );
     await page.getByText('Post', { exact: true }).click();
     expect((await postCall).status()).toBe(201);
+    await expectNoPageErrors(errors);
+  });
+
+  /**
+   * The same flow with a real VIDEO, which is what this app is actually for — and which the
+   * PNG test above never exercised.
+   *
+   * Video is where the web upload path was most likely to break: it used to re-fetch the
+   * picker's blob: URI to rebuild the file in memory, and a failure there threw a bare
+   * TypeError that the compose screen could only report as "Something went wrong", with
+   * nothing sent and nothing logged server-side. See api/formFile.ts.
+   */
+  test('the compose flow accepts a video and submits successfully', async ({ page }) => {
+    const errors = watchForErrors(page);
+    // Its own city, per freshCity()'s note: otherwise this test's fixture piles onto the
+    // shared TEST_CITY feed that the other posting tests read, and they start timing out
+    // waiting for a feed that has grown past its first page.
+    const chef = await apiSignup({ handle: uid('vposter'), isRestaurant: true, city: freshCity() });
+    await loginViaStorage(page, chef.token);
+    await expectOnFeed(page);
+
+    await page.getByLabel('Create a new post').last().click();
+    await expect(page.getByText('New Post', { exact: true })).toBeVisible({ timeout: 20_000 });
+
+    const chooserPromise = page.waitForEvent('filechooser');
+    await page.getByText('Drop your video or image — 9:16 works best').click();
+    const chooser = await chooserPromise;
+    await chooser.setFiles(path.join(__dirname, 'fixtures', 'clip.mp4'));
+
+    await page.getByPlaceholder('Fresh off the grill tonight...').fill(`Smoke video post ${Date.now()}`);
+
+    const postCall = page.waitForResponse(
+      (r) => r.url().endsWith('/posts') && r.request().method() === 'POST',
+      { timeout: 60_000 }
+    );
+    await page.getByText('Post', { exact: true }).click();
+    expect((await postCall).status()).toBe(201);
+
+    // The failure this guards against never reached the network at all, so "no error dialog"
+    // is as load-bearing as the 201 above.
+    await expect(page.getByText('Couldn’t post', { exact: true })).toHaveCount(0);
     await expectNoPageErrors(errors);
   });
 });
