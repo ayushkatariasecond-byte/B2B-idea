@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { prisma } from '../db';
+import { prisma, isUniqueConstraintError } from '../db';
 import { requireAuth, requireOwner, optionalAuth, rejectGuest, AuthedRequest } from '../middleware/auth';
 import { serializeBusiness, serializePost } from '../utils/serialize';
 import { upload, verifyUploadedMedia } from '../upload';
@@ -48,8 +48,17 @@ businessesRouter.get('/search', optionalAuth, async (req, res) => {
   // filter.
   const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : '';
   if (!q) return res.json({ businesses: [] });
+  // `suspended` is checked here, not just on the posts: suspending an account hid its
+  // posts but left the account itself surfacing in search and suggested-follows, so a
+  // moderated business stayed findable and followable. Blocked accounts are excluded for
+  // the same reason they are everywhere else.
+  const excluded = await getExcludedBusinessIds((req as AuthedRequest).businessId);
   const businesses = await prisma.business.findMany({
-    where: { OR: [{ name: { contains: q } }, { handle: { contains: q } }] },
+    where: {
+      suspended: false,
+      id: { notIn: excluded },
+      OR: [{ name: { contains: q } }, { handle: { contains: q } }],
+    },
     take: 8,
   });
   res.json({ businesses: businesses.map((b) => serializeBusiness(b)) });
@@ -59,7 +68,10 @@ businessesRouter.get('/suggested', requireAuth, async (req: AuthedRequest, res) 
   const [following, all] = await Promise.all([
     prisma.follow.findMany({ where: { followerId: req.businessId! }, select: { followeeId: true } }),
     prisma.business.findMany({
-      where: { id: { not: req.businessId! } },
+      where: {
+        id: { not: req.businessId!, notIn: await getExcludedBusinessIds(req.businessId) },
+        suspended: false,
+      },
       include: { _count: { select: { followers: true } } },
     }),
   ]);
@@ -168,7 +180,9 @@ const updateSchema = z.object({
   name: z.string().min(2).max(80).optional(),
   category: z.string().min(2).max(60).optional(),
   bio: z.string().max(280).optional(),
-  city: z.string().min(1).max(80).optional(),
+  // .trim() before .min(1): a city of only spaces used to pass, and since city is the
+  // fallback match key it left the account matching nothing at all.
+  city: z.string().trim().min(1, 'City is required').max(80).optional(),
   // Sent when the user grants (or re-grants) the location permission from profile setup.
   // Both must arrive together to be applied — see the pairing check in the handler.
   latitude: z.number().finite().min(-90).max(90).optional(),
@@ -267,16 +281,52 @@ businessesRouter.get('/me/export', requireAuth, requireOwner, rejectGuest, async
 
 businessesRouter.delete('/me', requireAuth, requireOwner, rejectGuest, async (req: AuthedRequest, res) => {
   const businessId = req.businessId!;
+  // Every relation is cleaned up in child-before-parent order. Anything referencing this
+  // business — or referencing a row that belongs to it — has to go first, because these
+  // FKs are `onDelete: Restrict` (Prisma's default for a required relation), so a single
+  // missed reference doesn't orphan a row, it aborts the whole delete with a 500.
+  //
+  // This previously only removed rows this account CREATED, which meant a post could not be
+  // deleted while anyone else's like/comment/save/view still pointed at it. In practice that
+  // made "delete my account" fail outright for any account whose posts had ever been
+  // interacted with — i.e. for exactly the accounts most likely to ask. Stories, story
+  // views, threads and filed reports were never deleted at all.
   await prisma.$transaction([
+    // Stories: views of my stories (by anyone) before the stories themselves, plus views
+    // I left on other people's stories.
+    prisma.storyView.deleteMany({ where: { story: { businessId } } }),
+    prisma.storyView.deleteMany({ where: { viewerId: businessId } }),
+    prisma.story.deleteMany({ where: { businessId } }),
+
+    // Threads: every message in any thread I'm part of (not just my own messages — the
+    // other participant's messages reference the same thread and would block its delete),
+    // then the threads.
+    prisma.message.deleteMany({
+      where: { thread: { OR: [{ participantAId: businessId }, { participantBId: businessId }] } },
+    }),
+    prisma.message.deleteMany({ where: { senderId: businessId } }),
+    prisma.thread.deleteMany({ where: { OR: [{ participantAId: businessId }, { participantBId: businessId }] } }),
+
+    // Reports I filed. (Reports ABOUT me store a plain targetId string, not an FK, so they
+    // don't block anything and are left as moderation history.)
+    prisma.report.deleteMany({ where: { reporterId: businessId } }),
+
+    // Post children — both directions. `businessId`/`viewerId` covers what I did to other
+    // people's posts; `post: { businessId }` covers what everyone else did to mine, which
+    // is the half that was missing.
     prisma.like.deleteMany({ where: { businessId } }),
+    prisma.like.deleteMany({ where: { post: { businessId } } }),
     prisma.comment.deleteMany({ where: { businessId } }),
+    prisma.comment.deleteMany({ where: { post: { businessId } } }),
     prisma.postView.deleteMany({ where: { viewerId: businessId } }),
+    prisma.postView.deleteMany({ where: { post: { businessId } } }),
     prisma.savedPost.deleteMany({ where: { businessId } }),
+    prisma.savedPost.deleteMany({ where: { post: { businessId } } }),
+
     prisma.follow.deleteMany({ where: { OR: [{ followerId: businessId }, { followeeId: businessId }] } }),
     prisma.block.deleteMany({ where: { OR: [{ blockerId: businessId }, { blockedId: businessId }] } }),
     prisma.notification.deleteMany({ where: { OR: [{ recipientId: businessId }, { actorId: businessId }] } }),
     prisma.businessMember.deleteMany({ where: { businessId } }),
-    prisma.message.deleteMany({ where: { senderId: businessId } }),
     prisma.postHashtag.deleteMany({ where: { post: { businessId } } }),
     prisma.post.deleteMany({ where: { businessId } }),
     // Redemptions this business made (as a logged-in redeemer, via userId) and redemptions
@@ -357,10 +407,16 @@ businessesRouter.post('/:id/follow', requireAuth, async (req: AuthedRequest, res
   });
 
   if (existing) {
-    await prisma.follow.delete({ where: { id: existing.id } });
+    // deleteMany, not delete: idempotent, so a double-tap unfollow can't 500 on the loser.
+    await prisma.follow.deleteMany({ where: { id: existing.id } });
   } else {
-    await prisma.follow.create({ data: { followerId, followeeId } });
-    void notify({ recipientId: followeeId, actorId: followerId, type: 'follow' });
+    try {
+      await prisma.follow.create({ data: { followerId, followeeId } });
+      void notify({ recipientId: followeeId, actorId: followerId, type: 'follow' });
+    } catch (err) {
+      // Lost a double-tap race — the other request already created this follow.
+      if (!isUniqueConstraintError(err)) throw err;
+    }
   }
 
   const followerCount = await prisma.follow.count({ where: { followeeId } });
@@ -377,9 +433,9 @@ businessesRouter.post('/:id/block', requireAuth, async (req: AuthedRequest, res)
 
   const existing = await prisma.block.findUnique({ where: { blockerId_blockedId: { blockerId, blockedId } } });
   if (existing) {
-    await prisma.block.delete({ where: { id: existing.id } });
+    await prisma.block.deleteMany({ where: { id: existing.id } });
   } else {
-    await prisma.block.create({ data: { blockerId, blockedId } });
+    await prisma.block.createMany({ data: { blockerId, blockedId }, skipDuplicates: true });
     await Promise.all([
       prisma.follow.deleteMany({ where: { followerId: blockerId, followeeId: blockedId } }),
       prisma.follow.deleteMany({ where: { followerId: blockedId, followeeId: blockerId } }),

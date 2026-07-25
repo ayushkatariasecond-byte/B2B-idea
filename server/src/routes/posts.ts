@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '../db';
+import { prisma, isUniqueConstraintError } from '../db';
 import { requireAuth, optionalAuth, AuthedRequest } from '../middleware/auth';
 import { serializePost } from '../utils/serialize';
 import { upload, mediaTypeFromMime, verifyUploadedMedia } from '../upload';
@@ -13,6 +13,7 @@ import { recencyBoost, velocityBoost, explorationJitter, currentHourBucket, dive
 import { containsBlockedContent } from '../utils/moderation';
 import { logger } from '../utils/logger';
 import { boundingBox, hasCoords, matchesLocation, DEFAULT_RADIUS_MILES } from '../utils/geo';
+import { safeText } from '../utils/text';
 
 export const postsRouter = Router();
 
@@ -31,6 +32,34 @@ function visibilityWhere() {
     hidden: false,
     OR: [{ status: 'published' }, { status: 'scheduled', scheduledFor: { lte: new Date() } }],
   };
+}
+
+/**
+ * True when a post is live for everyone: published (or a scheduled post whose time has
+ * come) and not moderated away. Mirrors `visibilityWhere()` above in JS, for the routes
+ * that load a single post by id rather than querying a list.
+ */
+function isLivePost(post: { hidden: boolean; status: string; scheduledFor: Date | null }): boolean {
+  if (post.hidden) return false;
+  if (post.status === 'published') return true;
+  return post.status === 'scheduled' && post.scheduledFor !== null && post.scheduledFor <= new Date();
+}
+
+/**
+ * Loads a post by id, but only if the caller is allowed to see it — live for everyone, or
+ * owned by the caller.
+ *
+ * Every single-post route needs this and most of them were missing it: the comments list,
+ * like, comment, share, save and view endpoints all only checked that the post EXISTED.
+ * That meant a moderator-hidden post (the whole point of hiding being to take it out of
+ * circulation) and an unpublished draft could still have their comment threads read, and
+ * could still be liked, commented on and share-counted by anyone holding the id.
+ */
+async function findViewablePost(postId: string, viewerId?: string) {
+  const post = await prisma.post.findUnique({ where: { id: postId } });
+  if (!post) return null;
+  if (!isLivePost(post) && post.businessId !== viewerId) return null;
+  return post;
 }
 
 async function linkHashtags(postId: string, caption: string) {
@@ -299,14 +328,20 @@ postsRouter.get('/saved', requireAuth, async (req: AuthedRequest, res) => {
 postsRouter.post('/:id/save', requireAuth, async (req: AuthedRequest, res) => {
   const postId = req.params.id;
   const businessId = req.businessId!;
-  const post = await prisma.post.findUnique({ where: { id: postId } });
+  const post = await findViewablePost(postId, businessId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
 
   const existing = await prisma.savedPost.findUnique({ where: { businessId_postId: { businessId, postId } } });
   if (existing) {
-    await prisma.savedPost.delete({ where: { id: existing.id } });
+    await prisma.savedPost.deleteMany({ where: { id: existing.id } });
   } else {
-    await prisma.savedPost.create({ data: { businessId, postId } });
+    try {
+      await prisma.savedPost.create({ data: { businessId, postId } });
+    } catch (err) {
+      // Lost a double-tap race — the other request created the row a moment earlier. The
+      // unique index did its job; the user's intent (this row exists) is already satisfied.
+      if (!isUniqueConstraintError(err)) throw err;
+    }
   }
   res.json({ saved: !existing });
 });
@@ -318,14 +353,10 @@ postsRouter.get('/:id', optionalAuth, async (req: AuthedRequest, res) => {
   });
   if (!post) return res.status(404).json({ error: 'Post not found' });
 
-  // Only the author may fetch a post that isn't live yet. Previously this checked `hidden`
-  // but not `status`, so a draft or a not-yet-due scheduled post — an unannounced menu
-  // change, a promo timed to a specific hour — was readable by anyone holding its id, even
-  // though the feed, discover, and profile listings all correctly hide it via
-  // visibilityWhere(). 404 rather than 403 so this endpoint doesn't confirm that an id
-  // exists to someone who isn't allowed to see it.
-  const isLive = !post.hidden && (post.status === 'published' || (post.status === 'scheduled' && post.scheduledFor !== null && post.scheduledFor <= new Date()));
-  if (!isLive && post.businessId !== req.businessId) {
+  // Only the author may fetch a post that isn't live yet — a draft or a not-yet-due
+  // scheduled post is an unannounced menu change or a timed promo. 404 rather than 403 so
+  // this endpoint doesn't confirm an id exists to someone who isn't allowed to see it.
+  if (!isLivePost(post) && post.businessId !== req.businessId) {
     return res.status(404).json({ error: 'Post not found' });
   }
   res.json({ post: serializePost(post) });
@@ -333,8 +364,10 @@ postsRouter.get('/:id', optionalAuth, async (req: AuthedRequest, res) => {
 
 const createSchema = z
   .object({
-    caption: z.string().max(2200).default(''),
-    tag: z.string().min(1).max(40),
+    // safeText, not z.string: these arrive as multipart fields, which multer parses after
+    // the global NUL guard in index.ts has already run.
+    caption: safeText().max(2200).default(''),
+    tag: safeText().min(1).max(40),
     status: z.enum(['draft', 'scheduled', 'published']).optional().default('published'),
     scheduledFor: z.string().datetime().optional(),
   })
@@ -393,8 +426,8 @@ postsRouter.post('/', requireAuth, postUpload, verifyUploadedMedia, async (req: 
 });
 
 const updateSchema = z.object({
-  caption: z.string().max(2200).optional(),
-  tag: z.string().min(1).max(40).optional(),
+  caption: safeText().max(2200).optional(),
+  tag: safeText().min(1).max(40).optional(),
   status: z.enum(['draft', 'scheduled', 'published']).optional(),
   scheduledFor: z.string().datetime().nullable().optional(),
 });
@@ -443,15 +476,22 @@ postsRouter.delete('/:id', requireAuth, async (req: AuthedRequest, res) => {
 postsRouter.post('/:id/like', requireAuth, async (req: AuthedRequest, res) => {
   const postId = req.params.id;
   const businessId = req.businessId!;
-  const post = await prisma.post.findUnique({ where: { id: postId } });
+  const post = await findViewablePost(postId, businessId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
 
   const existing = await prisma.like.findUnique({ where: { postId_businessId: { postId, businessId } } });
   if (existing) {
-    await prisma.like.delete({ where: { id: existing.id } });
+    // deleteMany, not delete: idempotent, so two rapid un-likes don't make the loser throw.
+    await prisma.like.deleteMany({ where: { id: existing.id } });
   } else {
-    await prisma.like.create({ data: { postId, businessId } });
-    void notify({ recipientId: post.businessId, actorId: businessId, type: 'like', postId });
+    try {
+      await prisma.like.create({ data: { postId, businessId } });
+      void notify({ recipientId: post.businessId, actorId: businessId, type: 'like', postId });
+    } catch (err) {
+      // Lost a double-tap race — the other request created the row a moment earlier. The
+      // unique index did its job; the user's intent (this row exists) is already satisfied.
+      if (!isUniqueConstraintError(err)) throw err;
+    }
   }
   const likeCount = await prisma.like.count({ where: { postId } });
   res.json({ likedByMe: !existing, likeCount });
@@ -459,7 +499,7 @@ postsRouter.post('/:id/like', requireAuth, async (req: AuthedRequest, res) => {
 
 postsRouter.post('/:id/view', optionalAuth, async (req: AuthedRequest, res) => {
   const postId = req.params.id;
-  const post = await prisma.post.findUnique({ where: { id: postId } });
+  const post = await findViewablePost(postId, req.businessId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
   await prisma.postView.create({ data: { postId, viewerId: req.businessId ?? null } });
   res.status(201).json({ ok: true });
@@ -467,7 +507,7 @@ postsRouter.post('/:id/view', optionalAuth, async (req: AuthedRequest, res) => {
 
 postsRouter.post('/:id/share', optionalAuth, async (req: AuthedRequest, res) => {
   const postId = req.params.id;
-  const post = await prisma.post.findUnique({ where: { id: postId } });
+  const post = await findViewablePost(postId, req.businessId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
   const updated = await prisma.post.update({ where: { id: postId }, data: { shareCount: { increment: 1 } } });
   res.json({ shareCount: updated.shareCount });
@@ -499,11 +539,16 @@ function serializeComment(c: {
 }
 
 postsRouter.get('/:id/comments', optionalAuth, async (req: AuthedRequest, res) => {
-  const post = await prisma.post.findUnique({ where: { id: req.params.id } });
+  const post = await findViewablePost(req.params.id, req.businessId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
 
+  // Blocking was applied to the feed, discover and the map, but not to comment threads —
+  // so after blocking someone you still read their comments on every post you opened. The
+  // same exclusion list is used here as everywhere else, which makes it symmetric: it
+  // covers both people you blocked and people who blocked you.
+  const excluded = await getExcludedBusinessIds(req.businessId);
   const comments = await prisma.comment.findMany({
-    where: { postId: req.params.id, hidden: false },
+    where: { postId: req.params.id, hidden: false, businessId: { notIn: excluded } },
     orderBy: { createdAt: 'asc' },
     include: { business: true },
   });
@@ -554,7 +599,7 @@ postsRouter.post('/:id/comments', requireAuth, async (req: AuthedRequest, res) =
   if (containsBlockedContent(parsed.data.text)) {
     return res.status(400).json({ error: 'This comment violates our content guidelines' });
   }
-  const post = await prisma.post.findUnique({ where: { id: req.params.id } });
+  const post = await findViewablePost(req.params.id, req.businessId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
 
   const comment = await prisma.comment.create({

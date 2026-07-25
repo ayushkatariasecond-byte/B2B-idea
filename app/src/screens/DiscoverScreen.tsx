@@ -45,6 +45,7 @@ export function DiscoverScreen() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [trendingTags, setTrendingTags] = useState<TrendingTag[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [businessMatches, setBusinessMatches] = useState<Business[]>([]);
 
   const isHashtagQuery = query.trim().startsWith('#');
@@ -59,13 +60,22 @@ export function DiscoverScreen() {
         hashtag: trimmed.startsWith('#') ? trimmed.slice(1) : undefined,
       });
       setPosts(res.posts);
+      setError(null);
+    } catch {
+      // Previously try/finally with no catch: a failed request left the PREVIOUS results
+      // on screen with no indication anything had gone wrong, so a server error looked
+      // identical to "these are your search results". Clearing and surfacing the failure
+      // matches how the feed screen already handles it.
+      setPosts([]);
+      setError("Couldn't load results. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    postsApi.getTrendingTags().then((res) => setTrendingTags(res.tags));
+    // Trending tags are decorative — a failure here must not become an unhandled rejection.
+    postsApi.getTrendingTags().then((res) => setTrendingTags(res.tags)).catch(() => setTrendingTags([]));
   }, []);
 
   useEffect(() => {
@@ -80,7 +90,12 @@ export function DiscoverScreen() {
       return;
     }
     const timeout = setTimeout(() => {
-      businessesApi.searchBusinesses(trimmed).then((res) => setBusinessMatches(res.businesses));
+      // Same reasoning as the trending-tags fetch: a failed search must degrade to "no
+      // business matches", not an unhandled rejection.
+      businessesApi
+        .searchBusinesses(trimmed)
+        .then((res) => setBusinessMatches(res.businesses))
+        .catch(() => setBusinessMatches([]));
     }, 200);
     return () => clearTimeout(timeout);
   }, [query]);
@@ -156,7 +171,7 @@ export function DiscoverScreen() {
         </View>
       ) : posts.length === 0 ? (
         <View style={styles.center}>
-          <Text style={styles.emptyText}>No posts match yet.</Text>
+          <Text style={styles.emptyText}>{error ?? 'No posts match yet.'}</Text>
         </View>
       ) : (
         <FlatList

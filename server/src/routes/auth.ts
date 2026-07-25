@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { prisma } from '../db';
+import { prisma, isUniqueConstraintError } from '../db';
 import { signToken, requireAuth, GUEST_EMAIL, AuthedRequest } from '../middleware/auth';
 import { serializeBusiness } from '../utils/serialize';
 import { emailSchema } from '../utils/email';
@@ -31,7 +31,9 @@ const signupSchema = z
       .min(2)
       .max(30)
       .regex(/^[a-z0-9_]+$/, 'Handle can only contain lowercase letters, numbers, and underscores'),
-    city: z.string().min(1, 'City is required').max(80),
+    // .trim() first: '   ' passed a bare .min(1) and produced an account whose only
+    // location signal was whitespace, so it matched no city and saw an empty feed forever.
+    city: z.string().trim().min(1, 'City is required').max(80),
     // Optional on purpose: the client sends these only when the user granted the location
     // permission. Declining is a supported path (the account falls back to city matching),
     // so a missing pair must not fail validation. Bounds are enforced here rather than
@@ -72,24 +74,36 @@ authRouter.post('/signup', async (req, res) => {
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const business = await prisma.business.create({
-    data: {
-      email,
-      passwordHash,
-      name,
-      handle,
-      city,
-      bio,
-      isRestaurant,
-      category: isRestaurant ? cuisine!.name : parsed.data.category!,
-      cuisineId: cuisine?.id ?? null,
-      // Only stored when the client actually sent a usable pair — a partial or
-      // out-of-range pair is left null so it falls into the city-matching path rather
-      // than becoming a coordinate that silently matches the wrong restaurants.
-      ...(hasCoords({ latitude, longitude }) ? { latitude, longitude } : {}),
-    },
-    include: { cuisine: true },
-  });
+  let business;
+  try {
+    business = await prisma.business.create({
+      data: {
+        email,
+        passwordHash,
+        name,
+        handle,
+        city,
+        bio,
+        isRestaurant,
+        category: isRestaurant ? cuisine!.name : parsed.data.category!,
+        cuisineId: cuisine?.id ?? null,
+        // Only stored when the client actually sent a usable pair — a partial or
+        // out-of-range pair is left null so it falls into the city-matching path rather
+        // than becoming a coordinate that silently matches the wrong restaurants.
+        ...(hasCoords({ latitude, longitude }) ? { latitude, longitude } : {}),
+      },
+      include: { cuisine: true },
+    });
+  } catch (err) {
+    // Two signups for the same email/handle submitted close enough together that both
+    // passed the existence checks above before either inserted. The unique index is the
+    // real guard; this just reports the loser the same way the slower request would have
+    // been reported, instead of a 500.
+    if (isUniqueConstraintError(err)) {
+      return res.status(409).json({ error: 'An account with this email or handle already exists' });
+    }
+    throw err;
+  }
 
   const verifyUrl = `${env.appWebUrl}/verify-email?token=${makeVerifyToken(business.id)}`;
   void sendWelcomeEmail({ email: business.email, name: business.name }, verifyUrl);

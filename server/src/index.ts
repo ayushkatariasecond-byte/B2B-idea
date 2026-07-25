@@ -24,6 +24,7 @@ import { prisma } from './db';
 import { setupRealtime } from './realtime';
 import { initSentry, sentryEnabled, Sentry } from './observability';
 import { helmetMiddleware, corsMiddleware, authLimiter, apiLimiter } from './security';
+import { rejectNulBodies } from './utils/text';
 
 // Initialize error monitoring before anything else (no-op unless SENTRY_DSN is set).
 initSentry();
@@ -36,6 +37,9 @@ if (env.nodeEnv === 'production') app.set('trust proxy', 1);
 app.use(helmetMiddleware);
 app.use(corsMiddleware);
 app.use(express.json());
+// Must sit directly after the JSON parser: a NUL byte anywhere in a body is unstorable in
+// Postgres and otherwise surfaces as a 500 from the driver. See utils/text.ts.
+app.use(rejectNulBodies);
 
 // Static media is served before the rate limiter so image/video requests aren't throttled.
 app.use('/uploads', express.static(UPLOAD_DIR));

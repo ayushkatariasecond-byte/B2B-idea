@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '../db';
+import { prisma, isUniqueConstraintError } from '../db';
 import { requireAuth, optionalAuth, rejectGuest, AuthedRequest } from '../middleware/auth';
 import { promoRedeemLimiter } from '../security';
 
@@ -41,10 +41,18 @@ promoCodesRouter.post('/', requireAuth, rejectGuest, async (req: AuthedRequest, 
   const existing = await prisma.promoCode.findUnique({ where: { code } });
   if (existing) return res.status(409).json({ error: 'That code is already taken' });
 
-  const promoCode = await prisma.promoCode.create({
-    data: { code, discountDescription: parsed.data.discountDescription, restaurantId: req.businessId! },
-  });
-  res.status(201).json({ promoCode });
+  try {
+    const promoCode = await prisma.promoCode.create({
+      data: { code, discountDescription: parsed.data.discountDescription, restaurantId: req.businessId! },
+    });
+    res.status(201).json({ promoCode });
+  } catch (err) {
+    // Same code submitted twice in quick succession — report it as taken, not as a crash.
+    if (isUniqueConstraintError(err)) {
+      return res.status(409).json({ error: 'That code is already taken' });
+    }
+    throw err;
+  }
 });
 
 const redeemSchema = z.object({
