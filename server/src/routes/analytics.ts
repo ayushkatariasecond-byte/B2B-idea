@@ -54,12 +54,17 @@ analyticsRouter.get('/me', requireAuth, async (req: AuthedRequest, res) => {
     ? Math.round(postScores.reduce((a, b) => a + b, 0) / postScores.length)
     : 50;
 
-  // Percentile vs every business that has at least one post. Excludes hidden (moderated)
-  // posts so removed content can't skew what other businesses are benchmarked against —
-  // unlike myPosts above, which intentionally keeps the viewer's own hidden posts so their
-  // own dashboard stays accurate.
+  // Percentile vs every RESTAURANT that has at least one post. The client renders this as
+  // "Top X% of restaurants on Nibbler", but the cohort used to be every business with a
+  // post — which included plain viewer accounts — so the number did not mean what the label
+  // said. Restricting the cohort to `isRestaurant` makes the label true rather than
+  // rewording the label to match a cohort nobody wants to be benchmarked against.
+  //
+  // Excludes hidden (moderated) posts so removed content can't skew what other restaurants
+  // are benchmarked against — unlike myPosts above, which intentionally keeps the viewer's
+  // own hidden posts so their own dashboard stays accurate.
   const allBusinessPosts = await prisma.post.findMany({
-    where: { ...visible, hidden: false },
+    where: { ...visible, hidden: false, business: { isRestaurant: true } },
     include: { _count: { select: { likes: true, comments: true } } },
   });
   const scoreByBusiness = new Map<string, number[]>();

@@ -47,6 +47,28 @@ export async function requireAuth(req: AuthedRequest, res: Response, next: NextF
 }
 
 /**
+ * Restricts a route to restaurant accounts.
+ *
+ * Nibbler is restaurant-only for publishing: viewers and guests browse, restaurants post.
+ * The compose button is already hidden for them in the app, but that is presentation, not
+ * enforcement — POST /posts accepted a viewer's token and created the row (verified: HTTP
+ * 201 with a persisted Post). Anything holding a valid token could publish into the feed.
+ *
+ * Deliberately mounted BEFORE the upload middleware on the routes that use it, so a
+ * rejected caller never causes multer to write their file to disk in the first place.
+ */
+export async function requireRestaurant(req: AuthedRequest, res: Response, next: NextFunction) {
+  const business = await prisma.business.findUnique({
+    where: { id: req.businessId! },
+    select: { isRestaurant: true },
+  });
+  if (!business?.isRestaurant) {
+    return res.status(403).json({ error: 'Only restaurant accounts can post' });
+  }
+  next();
+}
+
+/**
  * Blocks the shared guest identity from account-management operations.
  *
  * `requireOwner` is not enough on its own here: a guest token carries `mid: null`, so it IS

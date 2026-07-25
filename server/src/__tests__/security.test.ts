@@ -480,6 +480,66 @@ describe('Security: shared guest account', () => {
   });
 });
 
+describe('Security: restaurant-only posting', () => {
+  // Nibbler is restaurant-only for publishing. The compose button is hidden for viewers in
+  // the app, but that is presentation — the endpoint accepted a viewer's token and created
+  // the row (verified before the fix: HTTP 201 with a persisted Post).
+  it('rejects a post from a viewer account with 403 and creates nothing', async () => {
+    const viewer = await signup('postviewer', { isRestaurant: false, category: 'Just browsing', cuisineSlug: undefined });
+
+    const res = await request(app)
+      .post('/posts')
+      .set('Authorization', `Bearer ${viewer.token}`)
+      .field('caption', 'a viewer should not be able to post this')
+      .field('tag', 'Culture')
+      .attach('media', path.join(__dirname, 'fixtures', 'sample.png'));
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toMatch(/restaurant/i);
+    expect(await prisma.post.count({ where: { businessId: viewer.business.id } })).toBe(0);
+  });
+
+  it('still lets a restaurant account post normally', async () => {
+    const chef = await signup('postchef');
+    const res = await request(app)
+      .post('/posts')
+      .set('Authorization', `Bearer ${chef.token}`)
+      .field('caption', 'a restaurant can still post')
+      .field('tag', 'Culture')
+      .attach('media', path.join(__dirname, 'fixtures', 'sample.png'));
+
+    expect(res.status).toBe(201);
+    expect(await prisma.post.count({ where: { businessId: chef.business.id } })).toBe(1);
+  });
+
+  it('rejects the guest account too, since the shared guest is not a restaurant', async () => {
+    const guest = await request(app).post('/auth/guest').send({});
+    const res = await request(app)
+      .post('/posts')
+      .set('Authorization', `Bearer ${guest.body.token}`)
+      .field('caption', 'guest post attempt')
+      .field('tag', 'Culture')
+      .attach('media', path.join(__dirname, 'fixtures', 'sample.png'));
+
+    expect(res.status).toBe(403);
+  });
+
+  it('does not leave the rejected upload on disk', async () => {
+    const viewer = await signup('postviewerdisk', { isRestaurant: false, category: 'Just browsing', cuisineSlug: undefined });
+    const before = fs.readdirSync(UPLOAD_DIR).length;
+
+    await request(app)
+      .post('/posts')
+      .set('Authorization', `Bearer ${viewer.token}`)
+      .field('caption', 'rejected before multer writes anything')
+      .field('tag', 'Culture')
+      .attach('media', path.join(__dirname, 'fixtures', 'sample.png'));
+
+    // The guard runs before the upload middleware, so nothing should have been written.
+    expect(fs.readdirSync(UPLOAD_DIR).length).toBe(before);
+  });
+});
+
 describe('Security: unpublished content disclosure', () => {
   it('does not serve another account\'s draft post by id', async () => {
     const owner = await signup('draftowner');

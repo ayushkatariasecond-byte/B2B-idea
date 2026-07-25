@@ -381,3 +381,87 @@ describe('Bug: whitespace-only city passed signup validation', () => {
     expect(res.body.business.city).toBe('Austin');
   });
 });
+
+describe('Bug: analytics percentile counted non-restaurants', () => {
+  // The client labels this "Top X% of restaurants on Nibbler", but the cohort was every
+  // business with a visible post, viewer accounts included.
+  //
+  // Asserting an exact percentile is not possible — the cohort is global and every other
+  // test in this database contributes to it. So this asserts the property: adding
+  // top-scoring NON-restaurant posts must not move a restaurant's percentile.
+  //
+  // The restaurant is deliberately given a NEAR-TOP score first. An earlier version of this
+  // test used a default low-scoring post, which left the restaurant at the bottom of the
+  // cohort where its percentile was already ~100 and stayed ~100 whatever was added — the
+  // test passed against the unfixed code and proved nothing. Ranking it near the top makes
+  // its position genuinely sensitive to what else is in the cohort.
+  const TOP_CAPTION =
+    'A deliberately long caption that clears every length bonus the score function offers! ' +
+    'x'.repeat(60);
+
+  it('ignores non-restaurant accounts when ranking a restaurant', async () => {
+    // A few plain restaurants so the cohort is never degenerate. Without them a run of this
+    // test on its own leaves a cohort of ONE (globalSetup resets the database per jest
+    // invocation), where the percentile is 100 by definition and nothing can be detected.
+    for (let i = 0; i < 4; i++) {
+      const filler = await signup(`pctfiller${i}`);
+      await mkPost(filler.token, { caption: `filler ${i}` });
+    }
+
+    const chef = await signup('pctchef');
+    const post = await mkPost(chef.token, { caption: TOP_CAPTION });
+    // Push the restaurant to the TOP of the cohort (caption bonuses + engagement). Being
+    // top-ranked is what makes the assertion below sensitive: a restaurant sitting last is
+    // already at 100% and would stay there no matter what is added.
+    await prisma.post.update({ where: { id: post.body.post.id }, data: { shareCount: 30 } });
+
+    const read = async () => {
+      const res = await request(app).get('/analytics/me').set('Authorization', `Bearer ${chef.token}`);
+      expect(res.status).toBe(200);
+      return res.body as { percentileTop: number; creativityScore: number };
+    };
+
+    const before = await read();
+    // Precondition for sensitivity: the restaurant must not already be last in the cohort.
+    expect(before.percentileTop).toBeLessThan(100);
+
+    // Ten viewer accounts each carrying a post that outscores the restaurant, written
+    // straight to the database because the API now refuses posts from non-restaurants —
+    // this is the shape of legacy rows from before that guard, and what the old cohort counted.
+    for (let i = 0; i < 10; i++) {
+      const viewer = await signup(`pctviewer${i}`, {
+        isRestaurant: false,
+        category: 'Just browsing',
+        cuisineSlug: undefined,
+      });
+      await prisma.post.create({
+        data: {
+          businessId: viewer.business.id,
+          mediaUrl: '/uploads/fixture.png',
+          mediaType: 'image',
+          caption: TOP_CAPTION,
+          tag: 'Culture',
+          status: 'published',
+          hidden: false,
+          shareCount: 500,
+        },
+      });
+    }
+
+    const after = await read();
+
+    // Ten entries scoring above this restaurant would push it down the ranking if the
+    // cohort still counted non-restaurants.
+    expect(after.percentileTop).toBe(before.percentileTop);
+    expect(after.creativityScore).toBe(before.creativityScore);
+  });
+
+  it('still returns a percentile in a sane range for a restaurant', async () => {
+    const chef = await signup('pctrange');
+    await mkPost(chef.token, { caption: `Percentile range ${Math.random().toString(36).slice(2, 8)}` });
+    const res = await request(app).get('/analytics/me').set('Authorization', `Bearer ${chef.token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.percentileTop).toBeGreaterThanOrEqual(1);
+    expect(res.body.percentileTop).toBeLessThanOrEqual(100);
+  });
+});

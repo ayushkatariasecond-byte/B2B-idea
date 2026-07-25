@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma, isUniqueConstraintError } from '../db';
-import { requireAuth, optionalAuth, AuthedRequest } from '../middleware/auth';
+import { requireAuth, optionalAuth, requireRestaurant, AuthedRequest } from '../middleware/auth';
 import { serializePost } from '../utils/serialize';
 import { upload, mediaTypeFromMime, verifyUploadedMedia } from '../upload';
 import { extractHashtags } from '../utils/hashtags';
@@ -381,7 +381,9 @@ const postUpload = upload.fields([
   { name: 'thumbnail', maxCount: 1 },
 ]);
 
-postsRouter.post('/', requireAuth, postUpload, verifyUploadedMedia, async (req: AuthedRequest, res) => {
+// requireRestaurant sits before postUpload on purpose: a viewer's request is refused
+// before multer writes anything to disk.
+postsRouter.post('/', requireAuth, requireRestaurant, postUpload, verifyUploadedMedia, async (req: AuthedRequest, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' });
   if (containsBlockedContent(parsed.data.caption)) {
