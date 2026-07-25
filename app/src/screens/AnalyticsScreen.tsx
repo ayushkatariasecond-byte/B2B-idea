@@ -9,6 +9,7 @@ import { colors, fonts, radius } from '../theme/tokens';
 import { RootStackParamList } from '../navigation/types';
 import { AnalyticsResponse } from '../api/types';
 import * as analyticsApi from '../api/analytics';
+import { alert } from '../utils/alert';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Analytics'>;
 
@@ -19,6 +20,36 @@ const CHART_HEIGHT = 104;
 function deltaLabel(value: number, suffix: string): string {
   const sign = value >= 0 ? '+' : '';
   return `${sign}${value}${suffix} vs last month`;
+}
+
+/**
+ * Plain-language explanation of the creativity score.
+ *
+ * Written against what server/src/utils/score.ts and the feed ranking in
+ * server/src/routes/posts.ts actually do, not against what the name suggests:
+ *  - every post starts at 40, gains up to 20 for caption shape (+10 at 40 characters,
+ *    +5 for a question or exclamation mark, +5 more at 100 characters) and up to 40 from
+ *    engagement, weighted likes x1, comments x2, shares x3 on a log curve;
+ *  - the number here is the mean across your posts (50 if you have none);
+ *  - the feed sorts by this score plus recency, velocity and personalization, so it
+ *    genuinely moves your position — but the city/radius filter runs BEFORE ranking, so
+ *    it can never carry a post outside your area. Saying otherwise would be false.
+ */
+function explainScore() {
+  alert(
+    'About your Creativity Score',
+    'Every post starts at 40 out of 100 and earns the rest two ways.\n\n' +
+      'Caption (up to 20): +10 once it reaches about 40 characters, +5 for a question or ' +
+      'exclamation mark, and +5 more past 100 characters.\n\n' +
+      'Engagement (up to 40): likes, comments and shares, where a comment counts double a ' +
+      'like and a share counts triple. Early gains move it most; later ones move it less.\n\n' +
+      'The number above is the average across your posts. It is the largest single input to ' +
+      'how your posts are ordered in the For You feed, alongside how recent they are and how ' +
+      'fast they are picking up engagement. Posts at 85 or above get the trending flame.\n\n' +
+      'One limit worth knowing: diners only ever see restaurants in their own city and within ' +
+      'about 20 miles. That filter is applied before ranking, so a high score improves where ' +
+      'you land in your local feed — it cannot reach diners in another city.'
+  );
 }
 
 export function AnalyticsScreen({ navigation }: Props) {
@@ -87,14 +118,24 @@ export function AnalyticsScreen({ navigation }: Props) {
           </View>
         </View>
 
-        <LinearGradient
-          colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.scoreCard}
+        <Pressable
+          onPress={explainScore}
+          accessibilityRole="button"
+          accessibilityLabel="What is the Creativity Score?"
         >
+          <LinearGradient
+            colors={[colors.gradientGoldStart, colors.gradientGoldEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.scoreCard}
+          >
           <View>
-            <Text style={styles.scoreLabel}>Creativity Score</Text>
+            <View style={styles.scoreLabelRow}>
+              <Text style={styles.scoreLabel}>Creativity Score</Text>
+              {/* Text affordance rather than an icon: there is no info glyph in IconName,
+                  and adding one would be a wider change than this needs. */}
+              <Text style={styles.scoreHint}>What’s this?</Text>
+            </View>
             <Text style={styles.scoreValue}>
               {data.creativityScore}
               <Text style={styles.scoreOutOf}> / 100</Text>
@@ -116,7 +157,8 @@ export function AnalyticsScreen({ navigation }: Props) {
               transform="rotate(-90 31 31)"
             />
           </Svg>
-        </LinearGradient>
+          </LinearGradient>
+        </Pressable>
 
         <View style={styles.chartCard}>
           <Text style={styles.chartTitle}>Weekly views</Text>
@@ -211,7 +253,9 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 8,
   },
+  scoreLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   scoreLabel: { fontSize: 12, color: 'rgba(255,255,255,0.85)', fontFamily: fonts.body.semiBold },
+  scoreHint: { fontSize: 11, color: 'rgba(255,255,255,0.7)', fontFamily: fonts.body.regular, textDecorationLine: 'underline' },
   scoreValue: { fontFamily: fonts.display.bold, fontSize: 32, color: colors.white, marginTop: 6 },
   scoreOutOf: { fontSize: 15, color: 'rgba(255,255,255,0.8)' },
   scorePercentile: { fontSize: 11.5, color: 'rgba(255,255,255,0.9)', marginTop: 4, fontFamily: fonts.body.regular },

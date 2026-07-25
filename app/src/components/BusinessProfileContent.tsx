@@ -121,7 +121,10 @@ export function BusinessProfileContent({ business, posts, headerAction, moreActi
               </Pressable>
             </View>
 
-            {business.isMe && (
+            {/* Restaurant-only: the analytics dashboard reports post reach, engagement and
+                creativity score, none of which mean anything for a viewer account that
+                never posts. Same gate as the Promo Codes button below. */}
+            {business.isMe && business.isRestaurant && (
               <Pressable style={styles.analyticsButton} onPress={() => navigation.navigate('Analytics')}>
                 <Icon name="barChart" color={colors.gradientGoldEnd} size={16} />
                 <Text style={styles.analyticsButtonText}>View Analytics</Text>
